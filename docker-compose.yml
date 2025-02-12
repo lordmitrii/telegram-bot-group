@@ -5,3 +5,5 @@ services:
     restart: always  # Restart if the bot crashes
     env_file:
       - .env 
+    environment:
+    - TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}

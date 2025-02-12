@@ -2,6 +2,9 @@ import logging
 import os
 from telegram import Update, ChatMember
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Logging 
 logging.basicConfig(
@@ -132,7 +135,7 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # Main function
 if __name__ == '__main__':
-    application = ApplicationBuilder().token(os.environ.get("TOKEN")).build()
+    application = ApplicationBuilder().token(os.getenv("TOKEN")).build()
 
     # Command handlers
     application.add_handler(CommandHandler('start', start))
