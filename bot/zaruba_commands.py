@@ -59,13 +59,27 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Lists registered users."""
     global registered_users, zaruba_time
 
+
+    chat = await context.bot.get_chat(update.effective_chat.id)
+    bot_username = context.bot.username 
+    members = [member for member in await context.bot.get_chat_administrators(chat.id)]
+    member_usernames = [m.user.username or m.user.first_name for m in members if m.user.username != bot_username] 
+
+    if not member_usernames:
+        await update.message.reply_text(MESSAGES["list_members_error"])
+        return
+
     if zaruba_time is None:
         await update.message.reply_text(MESSAGES["list_no_zaruba"])
         return
 
-    response_text = MESSAGES["list_registered"] + "\n"
-    for username, time in registered_users.items():
-        response_text += f"✅ @{username} - {time}\n"
+    response_text = f"{MESSAGES['list_registered']}\n"
+
+    for username in member_usernames:
+        if username in registered_users:
+            response_text += f"✅ @{username} - на {registered_users[username]}\n"
+        else:
+            response_text += f"❌ @{username} не зарегистрирован\n"  
 
     await update.message.reply_text(response_text, parse_mode="Markdown")
 

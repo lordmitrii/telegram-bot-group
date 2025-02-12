@@ -51,30 +51,6 @@ async def test_reg_command():
     )
     assert zaruba_commands.registered_users["test_user"] == "18:00"
 
-@pytest.mark.asyncio
-async def test_list_users():
-    """Test /list command lists registered users."""
-    zaruba_commands.zaruba_time = "18:00"
-    zaruba_commands.registered_users = {"test_user": "18:00"}
-
-    update = AsyncMock()
-    update.message = AsyncMock(spec=Message)
-    update.effective_chat = AsyncMock(spec=Chat)
-    update.message.reply_text = AsyncMock()
-
-    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
-    context.bot = AsyncMock(spec=Bot)
-    context.bot.username = "test_bot"
-    context.bot.get_chat.return_value = AsyncMock(spec=Chat)
-    context.bot.get_chat_administrators.return_value = [
-        AsyncMock(spec=ChatMember, user=AsyncMock(spec=User, username="test_user")),
-        AsyncMock(spec=ChatMember, user=AsyncMock(spec=User, username="other_user"))
-    ]
-
-    await zaruba_commands.list_users(update, context)
-
-    expected_message = f"{MESSAGES['list_registered']}\n✅ @test_user - 18:00\n"
-    update.message.reply_text.assert_called_once_with(expected_message, parse_mode="Markdown")
 
 @pytest.mark.asyncio
 async def test_cancel_zaruba():
@@ -111,3 +87,53 @@ async def test_unreg():
 
     update.message.reply_text.assert_called_once_with(MESSAGES["unreg_success"].format(user="test_user"))
     assert "test_user" not in zaruba_commands.registered_users
+
+@pytest.mark.asyncio
+async def test_list_users():
+    """Test /list command retrieves chat members correctly."""
+    zaruba_commands.zaruba_time = "18:00"
+    zaruba_commands.registered_users = {"test_user": "18:00"}
+
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_chat = AsyncMock(spec=Chat)
+    update.message.reply_text = AsyncMock()
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.bot = AsyncMock(spec=Bot)
+    context.bot.username = "test_bot"
+
+    # Mock the chat and administrators
+    context.bot.get_chat.return_value = AsyncMock(spec=Chat)
+    context.bot.get_chat_administrators.return_value = [
+        AsyncMock(spec=ChatMember, user=AsyncMock(spec=User, username="test_user")),
+        AsyncMock(spec=ChatMember, user=AsyncMock(spec=User, username="other_user"))
+    ]
+
+    await zaruba_commands.list_users(update, context)
+
+    expected_message = f"{MESSAGES['list_registered']}\n✅ @test_user - на 18:00\n❌ @other_user не зарегистрирован\n"
+    update.message.reply_text.assert_called_once_with(expected_message, parse_mode="Markdown")
+
+@pytest.mark.asyncio
+async def test_list_users_no_members():
+    """Test /list when no members are found."""
+    zaruba_commands.zaruba_time = "18:00"
+    zaruba_commands.registered_users = {}
+
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_chat = AsyncMock(spec=Chat)
+    update.message.reply_text = AsyncMock()
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.bot = AsyncMock(spec=Bot)
+    context.bot.username = "test_bot"
+
+    
+    context.bot.get_chat.return_value = AsyncMock(spec=Chat)
+    context.bot.get_chat_administrators.return_value = []
+
+    await zaruba_commands.list_users(update, context)
+
+    update.message.reply_text.assert_called_once_with(MESSAGES["list_members_error"])

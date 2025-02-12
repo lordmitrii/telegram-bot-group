@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - "**"
 
 jobs:
   test:
@@ -26,6 +27,7 @@ jobs:
         run: pytest tests/
 
   deploy:
+    if: github.ref == 'refs/heads/main'  # Deploys ONLY if on main branch
     needs: test  # Ensures deployment runs only if tests pass
     runs-on: ubuntu-latest
 

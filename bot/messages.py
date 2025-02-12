@@ -25,6 +25,7 @@ MESSAGES = {
     "reg_success": "✅ @{user}, вы зарегистрированы на {time}!",
     "unreg_success": "🚫 @{user}, вы отменили регистрацию на зарубу.",
     "unreg_not_found": "❌ @{user}, вы не были зарегистрированы.",
+    "list_members_error": "❌ Не удалось получить список участников группы.",
     "list_no_zaruba": "🚫 Заруба пока не намечается.",
     "list_registered": "📜 *Список участников:*",
     "cancel_success": "🚫 Заруба отменена."
