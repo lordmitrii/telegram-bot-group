@@ -1,30 +1,46 @@
-name: Deploy to DigitalOcean
+name: Test and Deploy
 
 on:
   push:
     branches:
-      - main  # Runs the workflow when code is pushed to 'main'
+      - main
 
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the repo
       - name: Checkout Repository
         uses: actions/checkout@v3
 
-      # Step 2: Log in to Docker Hub
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run Tests
+        run: pytest tests/
+
+  deploy:
+    needs: test  # Ensures deployment runs only if tests pass
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
       - name: Login to Docker Hub
         run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
-      # Step 3: Build and push Docker image
       - name: Build and Push Docker Image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest
 
-      # Step 4: Deploy to DigitalOcean via SSH
       - name: Deploy to DigitalOcean
         uses: appleboy/ssh-action@master
         with:
