@@ -77,9 +77,9 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     for username in member_usernames:
         if username in registered_users:
-            response_text += f"✅ @{username} - на {registered_users[username]}\n"
+            response_text += MESSAGES["list_reg_yes"].format(user=username, time=registered_users[username])
         else:
-            response_text += f"❌ @{username} не зарегистрирован\n"  
+            response_text += MESSAGES["list_reg_no"].format(user=username)
 
     await update.message.reply_text(response_text, parse_mode="Markdown")
 
