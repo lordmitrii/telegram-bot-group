@@ -66,11 +66,11 @@ async def send_match_notifications(application):
         if not subscribers:
             logging.info("No subscribers found.")
             return
-        
-        message = "🔥 *Сегодняшний футбольчик:*\n\n"
+
+        message = MESSAGES["todays_football"]
         for league, home, away, time in big_games:
             match_time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S%z").strftime("%H:%M UTC")
-            message += f"⚽ *{home} vs {away}* ({league})\n⏰ *{match_time}*\n\n"
+            message += MESSAGES["football_game"].format(home=home, away=away, league=league, match_time=match_time)
         for chat_id in subscribers:
             try:
                 await application.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
