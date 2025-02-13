@@ -8,15 +8,16 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from bot.db_utils import add_subscriber, remove_subscriber, get_subscribers
 from bot.messages import MESSAGES 
-
+import pytz
+from difflib import get_close_matches
 
 
 LEAGUES = {
-    "Premier League": ["Liverpool", "Arsenal", "Manchester United", "Manchester City", "Chelsea", "Tottenham"],
+    "Premier League": ["Liverpool", "Arsenal", "Manchester United", "Manchester City", "Chelsea", "Tottenham", "Celtic", "Rangers"],
     "La Liga": ["Barcelona", "Atletico Madrid", "Real Madrid"],
-    "Bundesliga": ["Bayern Munich", "Borussia Dortmund", "Bayer Leverkusen"],
+    "Bundesliga": ["Bayern Mun", "Borussia Dort", "Bayer Leverk"],
     "Serie A": ["AC Milan", "Inter Milan", "Atalanta"],
-    "Premier League": ["Celtic", "Rangers"],
+    # "Premier League": ["Celtic", "Rangers"],
     "UEFA Champions League": "all"  # Include all UCL matches
 }
 
@@ -37,9 +38,10 @@ async def fetch_fixtures():
         return []
 
 async def get_big_matches():
-    """Filters today's matches based on top leagues and teams"""
+    """Filters today's matches based on top leagues and teams with partial matching"""
     fixtures = await fetch_fixtures()
     big_games = []
+
 
     for match in fixtures:
         league = match["competition"]["name"]
@@ -49,9 +51,12 @@ async def get_big_matches():
 
         if league == "UEFA Champions League":
             big_games.append((league, home_team, away_team, match_time))
-
-        elif league in LEAGUES and home_team in LEAGUES[league] and away_team in LEAGUES[league]:
-            big_games.append((league, home_team, away_team, match_time))
+        elif league in LEAGUES:
+            league_teams = LEAGUES[league]
+            # Using this thing is a very bad approach, unfortunately, the api documentation is very uninformative  
+            if get_close_matches(home_team, league_teams, n=1) and get_close_matches(away_team, league_teams, n=1):
+            
+                big_games.append((league, home_team, away_team, match_time))
 
     return big_games
 
@@ -69,7 +74,7 @@ async def send_match_notifications(application):
 
         message = MESSAGES["todays_football"]
         for league, home, away, time in big_games:
-            match_time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S%z").strftime("%H:%M UTC")
+            match_time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S%z").astimezone(pytz.timezone("Europe/Moscow")).strftime("%H:%M MSC")
             message += MESSAGES["football_game"].format(home=home, away=away, league=league, match_time=match_time)
         for chat_id in subscribers:
             try:
@@ -93,9 +98,9 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(MESSAGES["unsubscribe"])
 
 
-scheduler = BackgroundScheduler(timezone="UTC")
+scheduler = BackgroundScheduler(timezone="Europe/Moscow")
 
 def start_scheduler(application):
     """Starts the scheduler"""
-    scheduler.add_job(lambda: asyncio.run(send_match_notifications(application)), "cron", hour=8, minute=0)
+    scheduler.add_job(lambda: asyncio.run(send_match_notifications(application)), "cron", hour=11, minute=0)
     scheduler.start()
