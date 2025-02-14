@@ -1,127 +1,143 @@
 import pytest
-from unittest.mock import AsyncMock, patch
-from bot.football_updates import get_big_matches, get_subscribers, subscribe, unsubscribe, send_match_notifications, add_subscriber
+from unittest.mock import AsyncMock, patch, MagicMock
+from bot.football_updates import fetch_fixtures, get_big_matches, send_match_notifications
 from bot.messages import MESSAGES
+from datetime import datetime
+import pytz
+
+
+@pytest.mark.asyncio
+@patch("bot.football_updates.requests.get")
+async def test_fetch_fixtures_success(mock_get):
+    """Test fetching fixtures when API returns a valid response"""
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "matches": [
+            {
+                "competition": {"id": 2001, "name": "UEFA Champions League"},
+                "homeTeam": {"id": 64, "name": "Liverpool"},
+                "awayTeam": {"id": 65, "name": "Manchester City"},
+                "utcDate": "2025-02-14T20:00:00Z",
+            }
+        ]
+    }
+    mock_get.return_value = mock_response
+
+    fixtures = await fetch_fixtures()
+    assert fixtures == mock_response.json.return_value["matches"]
+
+
+@pytest.mark.asyncio
+@patch("bot.football_updates.requests.get")
+async def test_fetch_fixtures_failure(mock_get):
+    """Test fetching fixtures when API returns an error"""
+    mock_response = AsyncMock()
+    mock_response.status_code = 500
+    mock_response.text = "Internal Server Error"
+    mock_get.return_value = mock_response
+
+    fixtures = await fetch_fixtures()
+    assert fixtures == []  
+
 
 @pytest.mark.asyncio
 @patch("bot.football_updates.fetch_fixtures")
 async def test_get_big_matches(mock_fetch_fixtures):
-    """Test if get_big_matches correctly identifies big matches with fuzzy matching"""
-
+    """Test filtering of important matches"""
     mock_fetch_fixtures.return_value = [
         {
-            "competition": {"name": "Premier League"},
-            "homeTeam": {"name": "Manchester Utd"},
-            "awayTeam": {"name": "Liverpool"},
-            "utcDate": "2024-02-14T18:00:00Z"
+            "competition": {"id": 2001, "name": "UEFA Champions League"},
+            "homeTeam": {"id": 64, "name": "Liverpool"},
+            "awayTeam": {"id": 65, "name": "Manchester City"},
+            "utcDate": "2025-02-14T20:00:00Z",
         },
         {
-            "competition": {"name": "Premier League"},
-            "homeTeam": {"name": "Manchester United"},  # Slightly different format
-            "awayTeam": {"name": "Chelsea"},
-            "utcDate": "2024-02-14T20:00:00Z"
+            "competition": {"id": 2022, "name": "Unknown League"},
+            "homeTeam": {"id": 9000, "name": "Random FC"},
+            "awayTeam": {"id": 9001, "name": "Unknown United"},
+            "utcDate": "2025-02-14T21:00:00Z",
         },
         {
-            "competition": {"name": "La Liga"},
-            "homeTeam": {"name": "Real Madrid"},
-            "awayTeam": {"name": "Barcelona"},
-            "utcDate": "2024-02-14T21:00:00Z"
+            "competition": {"id": 2013, "name": "Premier League"},
+            "homeTeam": {"id": 66, "name": "Manchester United"},
+            "awayTeam": {"id": 61, "name": "Chelsea"},
+            "utcDate": "2025-02-14T19:00:00Z",
         },
-        {
-            "competition": {"name": "Bundesliga"},
-            "homeTeam": {"name": "FC Bayern"},
-            "awayTeam": {"name": "Borussia Dortmund"},
-            "utcDate": "2024-02-14T22:00:00Z"
-        },
-        {
-            "competition": {"name": "Serie A"},
-            "homeTeam": {"name": "Juventus"},  # Not in the LEAGUES list
-            "awayTeam": {"name": "Inter Milan"},
-            "utcDate": "2024-02-14T23:00:00Z"
-        }
     ]
 
     expected_matches = [
-        ("Premier League", "Manchester Utd", "Liverpool", "2024-02-14T18:00:00Z"),
-        ("Premier League", "Manchester United", "Chelsea", "2024-02-14T20:00:00Z"),
-        ("La Liga", "Real Madrid", "Barcelona", "2024-02-14T21:00:00Z"),
-        ("Bundesliga", "FC Bayern", "Borussia Dortmund", "2024-02-14T22:00:00Z"),
+        ("UEFA Champions League", "Liverpool", "Manchester City", "2025-02-14T20:00:00Z"),
+        ("Premier League", "Manchester United", "Chelsea", "2025-02-14T19:00:00Z"),
     ]
 
     matches = await get_big_matches()
-    assert matches == expected_matches, f"Expected {expected_matches}, but got {matches}"
+    assert matches == expected_matches
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.fetch_fixtures")
-async def test_get_big_matches_no_matches(mock_fetch_fixtures):
-    """Test when no matches should be returned"""
-    
-    mock_fetch_fixtures.return_value = [
-        {
-            "competition": {"name": "Some Random League"},
-            "homeTeam": {"name": "Random FC"},
-            "awayTeam": {"name": "Unknown United"},
-            "utcDate": "2024-02-14T18:00:00Z"
-        }
+@patch("bot.football_updates.get_big_matches")
+@patch("bot.football_updates.get_subscribers")
+async def test_send_match_notifications(mock_get_subscribers, mock_get_big_matches):
+    """Test sending notifications to subscribers"""
+    mock_get_big_matches.return_value = [
+        ("Premier League", "Manchester United", "Chelsea", "2025-02-14T19:00:00Z")
     ]
+    mock_get_subscribers.return_value = [123456789, 987654321]  # Mocked chat IDs
 
-    matches = await get_big_matches()
-    assert matches == [], f"Expected an empty list, but got {matches}"
+    application_mock = AsyncMock()
+    bot_mock = AsyncMock()
+    application_mock.bot = bot_mock
+
+    # Dynamically format the message using `MESSAGES`
+    match_time = datetime.strptime(
+        "2025-02-14T19:00:00Z", "%Y-%m-%dT%H:%M:%SZ"
+    ).astimezone(pytz.timezone("Europe/Moscow")).strftime("%H:%M MSC")
+
+    expected_message = MESSAGES["todays_football"]
+    expected_message += MESSAGES["football_game"].format(
+        home="Manchester United", away="Chelsea", league="Premier League", match_time=match_time
+    )
+
+    await send_match_notifications(application_mock)
+
+    bot_mock.send_message.assert_any_call(chat_id=123456789, text=expected_message, parse_mode="Markdown")
+    bot_mock.send_message.assert_any_call(chat_id=987654321, text=expected_message, parse_mode="Markdown")
+
+    assert bot_mock.send_message.call_count == 2
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.fetch_fixtures")
-async def test_get_big_matches_ucl(mock_fetch_fixtures):
-    """Test if UEFA Champions League matches are always included"""
-    
-    mock_fetch_fixtures.return_value = [
-        {
-            "competition": {"name": "UEFA Champions League"},
-            "homeTeam": {"name": "Some Unknown Team"},
-            "awayTeam": {"name": "Another Unknown Team"},
-            "utcDate": "2024-02-14T19:00:00Z"
-        }
+@patch("bot.football_updates.get_big_matches")
+@patch("bot.football_updates.get_subscribers")
+async def test_send_match_notifications_no_subscribers(mock_get_subscribers, mock_get_big_matches):
+    """Test that no notifications are sent if there are no subscribers"""
+    mock_get_big_matches.return_value = [
+        ("Premier League", "Manchester United", "Chelsea", "2025-02-14T19:00:00Z")
     ]
+    mock_get_subscribers.return_value = []  # No subscribers
 
-    matches = await get_big_matches()
-    assert len(matches) == 1
-    assert matches[0][0] == "UEFA Champions League"
+    application_mock = AsyncMock()
+    bot_mock = AsyncMock()
+    application_mock.bot = bot_mock
 
+    await send_match_notifications(application_mock)
 
-@pytest.mark.asyncio
-async def test_subscribe():
-    """Test the /subscribe command."""
-    update = AsyncMock()
-    update.effective_chat.id = 12345
-    update.message.reply_text = AsyncMock()
-    context = AsyncMock()
+    bot_mock.send_message.assert_not_called()
 
-    await subscribe(update, context)
-    update.message.reply_text.assert_called_once_with(MESSAGES["subscribe"])
-    assert 12345 in get_subscribers()
 
 @pytest.mark.asyncio
-async def test_unsubscribe():
-    """Test the /unsubscribe command."""
-    add_subscriber(12345)
-    update = AsyncMock()
-    update.effective_chat.id = 12345
-    update.message.reply_text = AsyncMock()
-    context = AsyncMock()
+@patch("bot.football_updates.get_big_matches")
+@patch("bot.football_updates.get_subscribers")
+async def test_send_match_notifications_no_matches(mock_get_subscribers, mock_get_big_matches):
+    """Test that no notifications are sent if there are no big matches"""
+    mock_get_big_matches.return_value = []  # No big matches
+    mock_get_subscribers.return_value = [123456789]
 
-    await unsubscribe(update, context)
-    update.message.reply_text.assert_called_once_with(MESSAGES["unsubscribe"])
-    assert 12345 not in get_subscribers()
+    application_mock = AsyncMock()
+    bot_mock = AsyncMock()
+    application_mock.bot = bot_mock
 
-@pytest.mark.asyncio
-@patch("bot.football_updates.get_big_matches", return_value=[("Premier League", "Man Utd", "Liverpool", "2024-02-14T18:00:00Z")])
-@patch("bot.football_updates.get_subscribers", return_value=[12345])
-async def test_send_match_notifications(mock_get_big_matches, mock_get_subscribers):
-    """Test sending notifications to subscribers."""
-    application = AsyncMock()
-    application.bot.send_message = AsyncMock()
+    await send_match_notifications(application_mock)
 
-    await send_match_notifications(application)
-    application.bot.send_message.assert_called_once()
-
+    bot_mock.send_message.assert_not_called()

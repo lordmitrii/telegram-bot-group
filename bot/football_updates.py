@@ -1,6 +1,8 @@
 import requests
 import os
+import json
 import logging
+import pytz
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 import asyncio
@@ -8,18 +10,12 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from bot.db_utils import add_subscriber, remove_subscriber, get_subscribers
 from bot.messages import MESSAGES 
-import pytz
-from difflib import get_close_matches
 
 
-LEAGUES = {
-    "Premier League": ["Liverpool", "Arsenal", "Manchester United", "Manchester City", "Chelsea", "Tottenham", "Celtic", "Rangers"],
-    "La Liga": ["Barcelona", "Atletico Madrid", "Real Madrid"],
-    "Bundesliga": ["Bayern Mun", "Borussia Dort", "Bayer Leverk"],
-    "Serie A": ["AC Milan", "Inter Milan", "Atalanta"],
-    # "Premier League": ["Celtic", "Rangers"],
-    "UEFA Champions League": "all"  # Include all UCL matches
-}
+with open("team_ids.json", "r", encoding="utf-8") as file:
+    TEAMS = json.load(file)
+
+TEAMS_DICT = {team["team_id"]: {"team_name": team["team_name"], "team_league": team["team_league"]} for team in TEAMS}
 
 # Use Football-Data API query for today's matches
 URL = "https://api.football-data.org/v4/matches?TODAY"
@@ -44,19 +40,31 @@ async def get_big_matches():
 
 
     for match in fixtures:
-        league = match["competition"]["name"]
-        home_team = match["homeTeam"]["name"]
-        away_team = match["awayTeam"]["name"]
-        match_time = match["utcDate"]
+        league_id = match["competition"]["id"]
+        league_name_api = match["competition"]["name"]
+        home_team_api = match["homeTeam"]
+        away_team_api = match["awayTeam"]
+        match_time_api = match["utcDate"]
 
-        if league == "UEFA Champions League":
-            big_games.append((league, home_team, away_team, match_time))
-        elif league in LEAGUES:
-            league_teams = LEAGUES[league]
-            # Using this thing is a very bad approach, unfortunately, the api documentation is very uninformative  
-            if get_close_matches(home_team, league_teams, n=1) and get_close_matches(away_team, league_teams, n=1):
-            
-                big_games.append((league, home_team, away_team, match_time))
+        if league_id == 2001 or league_name_api == "UEFA Champions League":
+            home_team = home_team_api["name"]
+            away_team = away_team_api["name"]
+
+            if home_team_api["id"] in TEAMS_DICT.keys():
+                home_team = TEAMS_DICT[home_team_api["id"]]["team_name"]
+            if away_team_api["id"] in TEAMS_DICT.keys():
+                away_team = TEAMS_DICT[away_team_api["id"]]["team_name"]
+
+            big_games.append((league_name_api, home_team, away_team, match_time_api))
+
+        elif home_team_api["id"] in TEAMS_DICT.keys() and away_team_api["id"] in TEAMS_DICT.keys():
+            home_team = TEAMS_DICT[home_team_api["id"]]["team_name"]
+            away_team = TEAMS_DICT[away_team_api["id"]]["team_name"]
+            if TEAMS_DICT[home_team_api["id"]]["team_league"] == TEAMS_DICT[away_team_api["id"]]["team_league"]:
+                league_name = TEAMS_DICT[home_team_api["id"]]["team_league"]
+                big_games.append((league_name, home_team, away_team, match_time_api))
+            else:
+                big_games.append((league_name_api, home_team, away_team, match_time_api))
 
     return big_games
 

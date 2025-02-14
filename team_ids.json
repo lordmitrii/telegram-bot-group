@@ -1,0 +1,87 @@
+[
+    {
+        "team_id": 3,
+        "team_name": "Bayer 04 Leverkusen",
+        "team_league": "Bundesliga"
+    },
+    {
+        "team_id": 4,
+        "team_name": "Borussia Dortmund",
+        "team_league": "Bundesliga"
+    },
+    {
+        "team_id": 5,
+        "team_name": "FC Bayern Munich",
+        "team_league": "Bundesliga"
+    },
+    {
+        "team_id": 98,
+        "team_name": "AC Milan",
+        "team_league": "Seria A"
+    },
+    {
+        "team_id": 108,
+        "team_name": "Inter Milan",
+        "team_league": "Seria A"
+    },
+    {
+        "team_id": 102,
+        "team_name": "Atalanta",
+        "team_league": "Seria A"
+    },
+    {
+        "team_id": 732,
+        "team_name": "Celtic FC",
+        "team_league": "Scottish League"
+    },
+    {
+        "team_id": 5376,
+        "team_name": "Rangers FC",
+        "team_league": "Scottish League"
+    },
+    {
+        "team_id": 81,
+        "team_name": "Barcelona",
+        "team_league": "La Liga"
+    },
+    {
+        "team_id": 86,
+        "team_name": "Real Madrid",
+        "team_league": "La Liga"
+    },
+    {
+        "team_id": 78,
+        "team_name": "Atletico Madrid",
+        "team_league": "La Liga"
+    },
+    {
+        "team_id": 64,
+        "team_name": "Liverpool",
+        "team_league": "Premier League"
+    },
+    {
+        "team_id": 65,
+        "team_name": "Manchester City",
+        "team_league": "Premier League"
+    },
+    {
+        "team_id": 66,
+        "team_name": "Manchester United",
+        "team_league": "Premier League"
+    },
+    {
+        "team_id": 57,
+        "team_name": "Arsenal",
+        "team_league": "Premier League"
+    },
+    {
+        "team_id": 61,
+        "team_name": "Chelsea",
+        "team_league": "Premier League"
+    },
+    {
+        "team_id": 73,
+        "team_name": "Tottenham",
+        "team_league": "Premier League"
+    }   
+]
