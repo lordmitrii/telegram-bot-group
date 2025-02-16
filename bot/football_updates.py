@@ -110,5 +110,5 @@ scheduler = BackgroundScheduler(timezone="Europe/Moscow")
 
 def start_scheduler(application):
     """Starts the scheduler"""
-    scheduler.add_job(lambda: asyncio.run(send_match_notifications(application)), "cron", hour=11, minute=0)
+    scheduler.add_job(lambda: asyncio.run(send_match_notifications(application)), "interval", minutes=1)
     scheduler.start()
