@@ -89,6 +89,9 @@ async def test_send_match_notifications(mock_get_subscribers, mock_get_big_match
     bot_mock = AsyncMock()
     application_mock.bot = bot_mock
 
+    fake_context = AsyncMock()
+    fake_context.job.data = application_mock
+
     # Dynamically format the message using `MESSAGES`
     match_time = datetime.strptime(
         "2025-02-14T19:00:00Z", "%Y-%m-%dT%H:%M:%SZ"
@@ -99,7 +102,7 @@ async def test_send_match_notifications(mock_get_subscribers, mock_get_big_match
         home="Manchester United", away="Chelsea", league="Premier League", match_time=match_time
     )
 
-    await send_match_notifications(application_mock)
+    await send_match_notifications(fake_context)
 
     bot_mock.send_message.assert_any_call(chat_id=123456789, text=expected_message, parse_mode="Markdown")
     bot_mock.send_message.assert_any_call(chat_id=987654321, text=expected_message, parse_mode="Markdown")

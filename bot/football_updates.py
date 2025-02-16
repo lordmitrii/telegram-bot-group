@@ -3,9 +3,8 @@ import os
 import json
 import logging
 import pytz
-from datetime import datetime
-from apscheduler.schedulers.background import BackgroundScheduler
-import asyncio
+import datetime
+from telegram.ext import Application
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.db_utils import add_subscriber, remove_subscriber, get_subscribers
@@ -68,29 +67,36 @@ async def get_big_matches():
 
     return big_games
 
-async def send_match_notifications(application):
-    """Sends today's big match notifications to the chat"""
-    big_games = await get_big_matches()
+async def send_match_notifications(context):
+    """Fetch today's matches and notify subscribers."""
+    application = context.job.data
 
-    subscribers = get_subscribers()
-    
-    if big_games:
-        
-        if not subscribers:
-            logging.info("No subscribers found.")
-            return
+    big_games = await get_big_matches()  
 
-        message = MESSAGES["todays_football"]
-        for league, home, away, time in big_games:
-            match_time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%S%z").astimezone(pytz.timezone("Europe/Moscow")).strftime("%H:%M MSC")
-            message += MESSAGES["football_game"].format(home=home, away=away, league=league, match_time=match_time)
-        for chat_id in subscribers:
-            try:
-                await application.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
-            except Exception as e:
-                logging.error(f"Error sending message to {chat_id}: {e}")
-    else:
-        pass
+    if not big_games:
+        logging.info("No big games today.")
+        return
+
+    subscribers = get_subscribers()  
+    if not subscribers:
+        logging.info("No subscribers found.")
+        return
+
+    message = MESSAGES["todays_football"]
+    for league, home, away, time in big_games:
+        match_time = datetime.datetime.strptime(time, "%Y-%m-%dT%H:%M:%S%z").astimezone(
+            pytz.timezone("Europe/Moscow")
+        ).strftime("%H:%M MSC")
+
+        message += MESSAGES["football_game"].format(
+            home=home, away=away, league=league, match_time=match_time
+        )
+
+    for chat_id in subscribers:
+        try:
+            await application.bot.send_message(chat_id=chat_id, text=message, parse_mode="Markdown")
+        except Exception as e:
+            logging.error(f"Error sending message to {chat_id}: {e}")
 
 
 async def subscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -106,9 +112,16 @@ async def unsubscribe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(MESSAGES["unsubscribe"])
 
 
-scheduler = BackgroundScheduler(timezone="Europe/Moscow")
 
-def start_scheduler(application):
-    """Starts the scheduler"""
-    scheduler.add_job(lambda: asyncio.run(send_match_notifications(application)), "cron", hour=11, minute=0)
-    scheduler.start()
+def schedule_jobs(application: Application):
+    """Schedules the daily football notification job."""
+    moscow_tz = pytz.timezone("Europe/Moscow")
+    job_time = datetime.time(hour=11, minute=0, tzinfo=moscow_tz)
+
+    application.job_queue.run_daily(
+        send_match_notifications,
+        job_time,
+        name="football_updates",
+        data=application, 
+    )
+   
