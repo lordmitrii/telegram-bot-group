@@ -55,5 +55,6 @@ jobs:
             docker rm telegram-bot || true
             docker run -d --restart always --name telegram-bot \
               -e TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }} \
+              -e FOOTBALL_API_KEY=${{ secrets.FOOTBALL_API_KEY }} \
               -v ~/db.sqlite3:/app/db.sqlite3 \
               ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest
