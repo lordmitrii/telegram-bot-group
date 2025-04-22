@@ -13,6 +13,7 @@ async def test_zaruba_command():
     update.effective_user = AsyncMock(spec=User)
     update.effective_user.username = "test_user"
     update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
     context.args = ["18:00"]
@@ -40,6 +41,7 @@ async def test_reg_command():
     update.effective_user = AsyncMock(spec=User)
     update.effective_user.username = "test_user"
     update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
     context.args = []
@@ -60,6 +62,8 @@ async def test_cancel_zaruba():
 
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
+    update.effective_user.username = "test_user"
+    update.effective_chat.id = 123456
     update.message.reply_text = AsyncMock()
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
@@ -79,6 +83,7 @@ async def test_unreg():
     update.message = AsyncMock(spec=Message)
     update.effective_user = AsyncMock(spec=User)
     update.effective_user.username = "test_user"
+    update.effective_chat.id = 123456
     update.message.reply_text = AsyncMock()
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
