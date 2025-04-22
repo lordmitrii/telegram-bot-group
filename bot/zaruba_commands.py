@@ -1,11 +1,14 @@
 import logging
+import sqlite3
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.messages import MESSAGES 
+from bot.db_utils import change_zarubbl_counter, get_zarubbl_stats
 
 # Global state
 zaruba_time = None
 registered_users = {}
+BAD_THRESHOLD = 0.2
 
 async def zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Starts a new event and resets the registration list."""
@@ -25,6 +28,10 @@ async def zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE):
     registered_users[user_name] = zaruba_time
     await update.message.reply_text(MESSAGES["zaruba_created"].format(time=zaruba_time))
 
+    chat_id = update.effective_chat.id
+    person_name = update.effective_user.username
+    change_zarubbl_counter(person_name=person_name, chat_id=chat_id, type="initiate")
+
 async def reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Registers a user for the event."""
     global registered_users, zaruba_time
@@ -43,6 +50,10 @@ async def reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(MESSAGES["reg_success"].format(user=user_name, time=reg_time))
 
+    chat_id = update.effective_chat.id
+    person_name = update.effective_user.username
+    change_zarubbl_counter(person_name=person_name, chat_id=chat_id, type="reg",)
+
 async def unreg(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Allows a user to unregister."""
     global registered_users
@@ -51,7 +62,12 @@ async def unreg(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if user_name in registered_users:
         del registered_users[user_name]
+        
         await update.message.reply_text(MESSAGES["unreg_success"].format(user=user_name))
+
+        chat_id = update.effective_chat.id
+        person_name = update.effective_user.username
+        change_zarubbl_counter(person_name=person_name, chat_id=chat_id, type="unreg")
     else:
         await update.message.reply_text(MESSAGES["unreg_not_found"].format(user=user_name))
 
@@ -88,3 +104,39 @@ async def cancel_zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global zaruba_time, registered_users
     zaruba_time, registered_users = None, {}
     await update.message.reply_text(MESSAGES["cancel_success"])
+
+    chat_id = update.effective_chat.id
+    person_name = update.effective_user.username
+    change_zarubbl_counter(person_name=person_name, chat_id=chat_id, type="cancel")
+
+
+async def zaruba_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Get zaruba stats on the chat."""
+    chat_id = update.effective_chat.id
+
+    args = context.args
+    
+    try:
+        username = args[0].lstrip("@")
+        stats = get_zarubbl_stats(chat_id=chat_id, person_name=username)
+        await update.message.reply_text(MESSAGES["list_stats"].format(
+            user=username, initiated=stats["zarub_initiated"], canceled=stats["zarub_canceled"],
+            regnuto=stats["zarub_reg"], unregnuto=stats["zarub_unreg"]
+        ), parse_mode="Markdown")
+
+        chance = round((stats["zarub_canceled"] + stats["zarub_unreg"]) \
+                            / (stats["zarub_initiated"] + stats["zarub_reg"]), 2)
+          
+
+        if chance < BAD_THRESHOLD:
+
+            await update.message.reply_text(MESSAGES["stats_good"].format(chance=chance), parse_mode="Markdown")
+
+
+        else:
+            await update.message.reply_text(MESSAGES["stats_bad"].format(chance=chance), parse_mode="Markdown")
+
+    except Exception as e:
+        await update.message.reply_text("Пользователь указан неправильно. Используйте формат /stats <@пользователь>")
+        return
+

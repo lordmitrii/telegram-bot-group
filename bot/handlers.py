@@ -1,6 +1,6 @@
 from telegram.ext import CommandHandler, MessageHandler, filters
 from bot.base_commands import start, unknown, help
-from bot.zaruba_commands import  zaruba, reg, list_users, cancel_zaruba, unreg
+from bot.zaruba_commands import  zaruba, reg, list_users, cancel_zaruba, unreg, zaruba_stats
 from bot.football_updates import subscribe, unsubscribe
 
 
@@ -15,5 +15,6 @@ def get_handlers():
         CommandHandler('help', help),
         CommandHandler('subscribe', subscribe),
         CommandHandler('unsubscribe', unsubscribe),
+        CommandHandler('stats', zaruba_stats),
         MessageHandler(filters.COMMAND, unknown),
     ]
