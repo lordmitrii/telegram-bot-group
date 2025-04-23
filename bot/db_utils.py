@@ -5,11 +5,20 @@ import json
 with open("config.json", "r") as config_file:
     config = json.load(config_file)
 
-DB_PATH = config.get("DB_PATH", "db.slite3")
+_db_path = config.get("DB_PATH", "db.slite3")
+
+def get_db_path():
+    return _db_path
+
+def set_db_path(path):
+    global _db_path
+    _db_path = path
 
 
-def init_db(db_path=DB_PATH):
+
+def init_db(db_path=None):
     """Creates the database and table if not exists."""
+    db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("""
@@ -33,24 +42,27 @@ def init_db(db_path=DB_PATH):
     conn.commit()
     conn.close()
 
-def add_subscriber(chat_id, db_path=DB_PATH):
+def add_subscriber(chat_id, db_path=None):
     """Adds a chat ID to the database."""
+    db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO subscribers (chat_id) VALUES (?)", (chat_id,))
     conn.commit()
     conn.close()
 
-def remove_subscriber(chat_id, db_path=DB_PATH):
+def remove_subscriber(chat_id, db_path=None):
     """Removes a chat ID from the database."""
+    db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("DELETE FROM subscribers WHERE chat_id = ?", (chat_id,))
     conn.commit()
     conn.close()
 
-def get_subscribers(db_path=DB_PATH):
+def get_subscribers(db_path=None):
     """Fetches all subscribed chat IDs."""
+    db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT chat_id FROM subscribers")
@@ -58,8 +70,9 @@ def get_subscribers(db_path=DB_PATH):
     conn.close()
     return chat_ids
 
-def change_zarubbl_counter(person_name, chat_id, type, db_path=DB_PATH):
+def change_zarubbl_counter(person_name, chat_id, type, db_path=None):
     """Adjusts zarubbl counters for a given person_name."""
+    db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
@@ -80,8 +93,9 @@ def change_zarubbl_counter(person_name, chat_id, type, db_path=DB_PATH):
     conn.commit()
     conn.close()
 
-def get_zarubbl_stats(chat_id, person_name, db_path=DB_PATH):
+def get_zarubbl_stats(chat_id, person_name, db_path=None):
     """Get zarubbl stats for a given person_name."""
+    db_path = db_path or get_db_path()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 

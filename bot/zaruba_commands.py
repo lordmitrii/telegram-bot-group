@@ -1,5 +1,4 @@
 import logging
-import sqlite3
 from telegram import Update
 from telegram.ext import ContextTypes
 from bot.messages import MESSAGES 
@@ -42,7 +41,7 @@ async def reg(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if zaruba_time is None:
-        await update.message.reply_text(MESSAGES["reg_no_zaruba"])
+        await update.message.reply_text(MESSAGES["no_zaruba"])
         return
 
     reg_time = " ".join(context.args) if context.args else zaruba_time
@@ -103,6 +102,11 @@ async def cancel_zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels an ongoing zaruba event."""
     global zaruba_time, registered_users
     zaruba_time, registered_users = None, {}
+
+    if zaruba_time is None:
+        await update.message.reply_text(MESSAGES["no_zaruba"])
+        return
+    
     await update.message.reply_text(MESSAGES["cancel_success"])
 
     chat_id = update.effective_chat.id
@@ -130,11 +134,11 @@ async def zaruba_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if chance < BAD_THRESHOLD:
 
-            await update.message.reply_text(MESSAGES["stats_good"].format(chance=chance), parse_mode="Markdown")
+            await update.message.reply_text(MESSAGES["stats_good"].format(chance=chance*100), parse_mode="Markdown")
 
 
         else:
-            await update.message.reply_text(MESSAGES["stats_bad"].format(chance=chance), parse_mode="Markdown")
+            await update.message.reply_text(MESSAGES["stats_bad"].format(chance=chance*100), parse_mode="Markdown")
 
     except Exception as e:
         await update.message.reply_text("Пользователь указан неправильно. Используйте формат /stats <@пользователь>")

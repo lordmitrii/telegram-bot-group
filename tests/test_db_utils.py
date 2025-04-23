@@ -1,15 +1,19 @@
 import pytest
 import os, tempfile
-from bot.db_utils import add_subscriber, remove_subscriber, get_subscribers, init_db, change_zarubbl_counter, get_zarubbl_stats
+from bot.db_utils import add_subscriber, remove_subscriber, get_subscribers, init_db, change_zarubbl_counter, get_zarubbl_stats, set_db_path
 import sqlite3
 
 @pytest.fixture
 def test_db():
     with tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False) as tmp:
         db_path = tmp.name
-    init_db(db_path=db_path)
+
+    set_db_path(db_path)
+    init_db()
+
     yield db_path
-    # os.remove(db_path)
+    
+    os.remove(db_path)
 
 def test_add_subscriber(test_db):
     """Test adding a subscriber."""

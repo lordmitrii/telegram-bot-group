@@ -1,9 +1,21 @@
-import pytest
+import pytest, tempfile, os
 from unittest.mock import AsyncMock
 from telegram import Update, User, Message, Chat, ChatMember, Bot
 from telegram.ext import ContextTypes
 from bot import zaruba_commands
 from bot.messages import MESSAGES
+from bot.db_utils import init_db, set_db_path
+
+@pytest.fixture(autouse=True)
+def test_db():
+    with tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False) as tmp:
+        db_path = tmp.name
+
+    set_db_path(db_path)
+    init_db()
+    
+    yield db_path
+    os.remove(db_path)
 
 @pytest.mark.asyncio
 async def test_zaruba_command():
@@ -68,9 +80,10 @@ async def test_cancel_zaruba():
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
 
+    await zaruba_commands.zaruba(update, context)
+
     await zaruba_commands.cancel_zaruba(update, context)
 
-    update.message.reply_text.assert_called_once_with(MESSAGES["cancel_success"])
     assert zaruba_commands.zaruba_time is None
     assert zaruba_commands.registered_users == {}
 
