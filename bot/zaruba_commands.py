@@ -119,28 +119,35 @@ async def zaruba_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
     args = context.args
-    
+
     try:
-        username = args[0].lstrip("@")
-        stats = get_zarubbl_stats(chat_id=chat_id, person_name=username)
-        await update.message.reply_text(MESSAGES["list_stats"].format(
-            user=username, initiated=stats["zarub_initiated"], canceled=stats["zarub_canceled"],
-            regnuto=stats["zarub_reg"], unregnuto=stats["zarub_unreg"]
-        ), parse_mode="Markdown")
-
-        chance = round((stats["zarub_canceled"] + stats["zarub_unreg"]) \
-                            / (stats["zarub_initiated"] + stats["zarub_reg"]), 2)
-          
-
-        if chance < BAD_THRESHOLD:
-
-            await update.message.reply_text(MESSAGES["stats_good"].format(chance=chance*100), parse_mode="Markdown")
-
-
-        else:
-            await update.message.reply_text(MESSAGES["stats_bad"].format(chance=chance*100), parse_mode="Markdown")
-
-    except Exception as e:
+        username = update.effective_user.username if not args else args[0].lstrip("@")
+    except:
         await update.message.reply_text("Пользователь указан неправильно. Используйте формат /stats <@пользователь>")
         return
+
+
+    try:
+        stats = get_zarubbl_stats(chat_id=chat_id, person_name=username)
+    except IndexError:
+        await update.message.reply_text(f"Нет статистики о пользователе @{username}")
+        return
+    
+    await update.message.reply_text(MESSAGES["list_stats"].format(
+        user=username, initiated=stats["zarub_initiated"], canceled=stats["zarub_canceled"],
+        regnuto=stats["zarub_reg"], unregnuto=stats["zarub_unreg"]
+    ), parse_mode="Markdown")
+
+    chance = round((stats["zarub_canceled"] + stats["zarub_unreg"]) \
+                        / (stats["zarub_initiated"] + stats["zarub_reg"]), 2)
+        
+
+    if chance < BAD_THRESHOLD:
+
+        await update.message.reply_text(MESSAGES["stats_good"].format(chance=chance*100), parse_mode="Markdown")
+
+
+    else:
+        await update.message.reply_text(MESSAGES["stats_bad"].format(chance=chance*100), parse_mode="Markdown")
+
 
