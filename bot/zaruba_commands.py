@@ -101,12 +101,12 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancels an ongoing zaruba event."""
     global zaruba_time, registered_users
-    zaruba_time, registered_users = None, {}
 
     if zaruba_time is None:
         await update.message.reply_text(MESSAGES["no_zaruba"])
         return
     
+    zaruba_time, registered_users = None, {}
     await update.message.reply_text(MESSAGES["cancel_success"])
 
     chat_id = update.effective_chat.id
