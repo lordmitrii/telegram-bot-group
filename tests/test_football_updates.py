@@ -1,13 +1,13 @@
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-from bot.football_updates import fetch_fixtures, get_big_matches, send_match_notifications
+from bot.services.football import fetch_fixtures, get_big_matches, send_match_notifications
 from bot.messages import MESSAGES
 from datetime import datetime
 import pytz
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.requests.get")
+@patch("bot.services.football.requests.get")
 async def test_fetch_fixtures_success(mock_get):
     """Test fetching fixtures when API returns a valid response"""
     mock_response = MagicMock()
@@ -29,7 +29,7 @@ async def test_fetch_fixtures_success(mock_get):
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.requests.get")
+@patch("bot.services.football.requests.get")
 async def test_fetch_fixtures_failure(mock_get):
     """Test fetching fixtures when API returns an error"""
     mock_response = AsyncMock()
@@ -38,11 +38,11 @@ async def test_fetch_fixtures_failure(mock_get):
     mock_get.return_value = mock_response
 
     fixtures = await fetch_fixtures()
-    assert fixtures == []  
+    assert fixtures == []
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.fetch_fixtures")
+@patch("bot.services.football.fetch_fixtures")
 async def test_get_big_matches(mock_fetch_fixtures):
     """Test filtering of important matches"""
     mock_fetch_fixtures.return_value = [
@@ -76,8 +76,8 @@ async def test_get_big_matches(mock_fetch_fixtures):
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.get_big_matches")
-@patch("bot.football_updates.get_subscribers")
+@patch("bot.services.football.get_big_matches")
+@patch("bot.services.football.get_subscribers")
 async def test_send_match_notifications(mock_get_subscribers, mock_get_big_matches):
     """Test sending notifications to subscribers"""
     mock_get_big_matches.return_value = [
@@ -111,8 +111,8 @@ async def test_send_match_notifications(mock_get_subscribers, mock_get_big_match
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.get_big_matches")
-@patch("bot.football_updates.get_subscribers")
+@patch("bot.services.football.get_big_matches")
+@patch("bot.services.football.get_subscribers")
 async def test_send_match_notifications_no_subscribers(mock_get_subscribers, mock_get_big_matches):
     """Test that no notifications are sent if there are no subscribers"""
     mock_get_big_matches.return_value = [
@@ -130,8 +130,8 @@ async def test_send_match_notifications_no_subscribers(mock_get_subscribers, moc
 
 
 @pytest.mark.asyncio
-@patch("bot.football_updates.get_big_matches")
-@patch("bot.football_updates.get_subscribers")
+@patch("bot.services.football.get_big_matches")
+@patch("bot.services.football.get_subscribers")
 async def test_send_match_notifications_no_matches(mock_get_subscribers, mock_get_big_matches):
     """Test that no notifications are sent if there are no big matches"""
     mock_get_big_matches.return_value = []  # No big matches

@@ -1,6 +1,7 @@
 import pytest
 import os, tempfile
-from bot.db_utils import add_subscriber, remove_subscriber, get_subscribers, init_db, change_zarubbl_counter, get_zarubbl_stats, set_db_path
+from bot.db.repositories import add_subscriber, remove_subscriber, get_subscribers, init_db, change_zarubbl_counter, get_zarubbl_stats
+from bot.config import set_db_path
 import sqlite3
 
 @pytest.fixture
@@ -12,7 +13,7 @@ def test_db():
     init_db()
 
     yield db_path
-    
+
     os.remove(db_path)
 
 def test_add_subscriber(test_db):
@@ -47,5 +48,3 @@ def test_zarubbl_increase(test_db):
     assert stats['zarub_initiated'] == 1
     assert stats['zarub_unreg'] == 1
     assert stats['zarub_reg'] == 1
-       
-    

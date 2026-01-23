@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import AsyncMock
 from telegram import Update, Message
 from telegram.ext import ContextTypes
-from bot import base_commands
+from bot.commands import base as base_commands
 from bot.messages import MESSAGES
 
 @pytest.mark.asyncio

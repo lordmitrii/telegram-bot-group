@@ -2,9 +2,10 @@ import pytest, tempfile, os
 from unittest.mock import AsyncMock
 from telegram import Update, User, Message, Chat, ChatMember, Bot
 from telegram.ext import ContextTypes
-from bot import zaruba_commands
+from bot.commands import zaruba as zaruba_commands
 from bot.messages import MESSAGES
-from bot.db_utils import init_db, set_db_path
+from bot.db.repositories import init_db
+from bot.config import set_db_path
 
 @pytest.fixture(autouse=True)
 def test_db():
@@ -13,7 +14,7 @@ def test_db():
 
     set_db_path(db_path)
     init_db()
-    
+
     yield db_path
     os.remove(db_path)
 
@@ -151,7 +152,7 @@ async def test_list_users_no_members():
     context.bot = AsyncMock(spec=Bot)
     context.bot.username = "test_bot"
 
-    
+
     context.bot.get_chat.return_value = AsyncMock(spec=Chat)
     context.bot.get_chat_administrators.return_value = []
 

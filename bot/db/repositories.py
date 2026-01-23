@@ -1,19 +1,6 @@
 import sqlite3
-import os
-import json
 
-with open("config.json", "r") as config_file:
-    config = json.load(config_file)
-
-_db_path = config.get("DB_PATH", "db.slite3")
-
-def get_db_path():
-    return _db_path
-
-def set_db_path(path):
-    global _db_path
-    _db_path = path
-
+from bot.config import get_db_path
 
 
 def init_db(db_path=None):
@@ -34,13 +21,14 @@ def init_db(db_path=None):
             zarub_initiated INTEGER DEFAULT 0,
             zarub_reg INTEGER DEFAULT 0,
             zarub_canceled INTEGER DEFAULT 0,
-            zarub_unreg INTEGER DEFAULT 0,      
-            PRIMARY KEY (person_name, chat_id)               
+            zarub_unreg INTEGER DEFAULT 0,
+            PRIMARY KEY (person_name, chat_id)
         )
     """)
 
     conn.commit()
     conn.close()
+
 
 def add_subscriber(chat_id, db_path=None):
     """Adds a chat ID to the database."""
@@ -51,6 +39,7 @@ def add_subscriber(chat_id, db_path=None):
     conn.commit()
     conn.close()
 
+
 def remove_subscriber(chat_id, db_path=None):
     """Removes a chat ID from the database."""
     db_path = db_path or get_db_path()
@@ -59,6 +48,7 @@ def remove_subscriber(chat_id, db_path=None):
     cursor.execute("DELETE FROM subscribers WHERE chat_id = ?", (chat_id,))
     conn.commit()
     conn.close()
+
 
 def get_subscribers(db_path=None):
     """Fetches all subscribed chat IDs."""
@@ -69,6 +59,7 @@ def get_subscribers(db_path=None):
     chat_ids = [row[0] for row in cursor.fetchall()]
     conn.close()
     return chat_ids
+
 
 def change_zarubbl_counter(person_name, chat_id, type, db_path=None):
     """Adjusts zarubbl counters for a given person_name."""
@@ -92,6 +83,7 @@ def change_zarubbl_counter(person_name, chat_id, type, db_path=None):
 
     conn.commit()
     conn.close()
+
 
 def get_zarubbl_stats(chat_id, person_name, db_path=None):
     """Get zarubbl stats for a given person_name."""
