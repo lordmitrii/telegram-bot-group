@@ -2,13 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies first for better caching
+# Copy source code and install
 COPY pyproject.toml .
-RUN pip install --no-cache-dir .
-
-# Copy source code
 COPY src/ src/
 COPY data/ data/
+RUN pip install --no-cache-dir .
 
 # Environment variables
 ARG TOKEN
