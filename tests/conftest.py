@@ -5,8 +5,22 @@ import tempfile
 
 import pytest
 
-from src.bot.core.config import set_db_path
+from src.bot.core.config import get_settings, set_db_path
 from src.bot.repositories.base import init_db
+
+
+@pytest.fixture(scope="session", autouse=True)
+def test_env():
+    """Ensure required settings are present for test runs."""
+    original_token = os.environ.get("TOKEN")
+    os.environ.setdefault("TOKEN", "test-token")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+    if original_token is None:
+        os.environ.pop("TOKEN", None)
+    else:
+        os.environ["TOKEN"] = original_token
 
 
 @pytest.fixture
