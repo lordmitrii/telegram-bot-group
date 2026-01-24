@@ -55,4 +55,8 @@ MESSAGES = {
 
     "football_game": "⚽ *{home} vs {away}* ({league})\n⏰ *{match_time}*\n\n",
     "todays_football": "🔥 *Сегодняшний футбольчик:*\n\n",
+    "football_zaruba_cta": (
+        "📺 Собираемся на футбол, братва! Регистрация на зарубу — /reg"
+    ),
+    "football_time": "футбольное время 🕒"
 }

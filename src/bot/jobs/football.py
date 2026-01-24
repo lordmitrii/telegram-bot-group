@@ -9,6 +9,7 @@ from src.bot.core.constants import MOSCOW_TZ
 from src.bot.i18n.messages import MESSAGES
 from src.bot.repositories.subscriber import get_subscribers
 from src.bot.services.football import FootballService
+from src.bot.services.zaruba import ZarubaService
 
 
 async def send_match_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -19,8 +20,9 @@ async def send_match_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
     big_games = await service.get_big_matches()
 
     if not big_games:
-        logging.info("No big games today.")
+        logging.info("No big games today. Sending a placeholder match.")
         return
+        
 
     subscribers = get_subscribers()
     if not subscribers:
@@ -37,7 +39,24 @@ async def send_match_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
             match_time=match_time,
         )
 
+    if len(big_games) == 1:
+        zaruba_time = service.format_match_time(big_games[0].utc_date)
+    else:
+        match_times = {service.format_match_time(match.utc_date) for match in big_games}
+        if len(match_times) == 1:
+            zaruba_time = next(iter(match_times))
+        else:
+            zaruba_time = MESSAGES["football_time"]
+    zaruba_service = ZarubaService()
+
     for chat_id in subscribers:
+        if zaruba_service.get_session(chat_id) is None:
+            message += MESSAGES["football_zaruba_cta"]
+            zaruba_service.create_zaruba(
+                chat_id=chat_id,
+                time=zaruba_time,
+                creator_username="football_bot",
+            )
         try:
             await application.bot.send_message(
                 chat_id=chat_id, text=message, parse_mode="Markdown"
@@ -48,7 +67,7 @@ async def send_match_notifications(context: ContextTypes.DEFAULT_TYPE) -> None:
 
 def schedule_football_updates(application: Application) -> None:
     """Schedule the daily football notification job."""
-    job_time = datetime.time(hour=11, minute=0, tzinfo=MOSCOW_TZ)
+    job_time = datetime.time(hour=11, minute=00, tzinfo=MOSCOW_TZ)
 
     if application.job_queue.get_jobs_by_name("football_updates"):
         return

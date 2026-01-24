@@ -116,6 +116,16 @@ class SessionRepository(BaseRepository):
             )
             return cursor.rowcount > 0
 
+    def delete_all_sessions(self) -> int:
+        """Delete all zaruba sessions.
+
+        Returns the number of deleted sessions.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM zaruba_sessions")
+            return cursor.rowcount
+
     def has_active_session(self, chat_id: int) -> bool:
         """Check if a chat has an active zaruba session."""
         return self.get_session(chat_id) is not None

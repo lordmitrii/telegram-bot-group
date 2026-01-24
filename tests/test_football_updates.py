@@ -81,13 +81,19 @@ async def test_get_big_matches(mock_fetch_fixtures):
 
 
 @pytest.mark.asyncio
+@patch("src.bot.jobs.football.ZarubaService")
 @patch("src.bot.jobs.football.FootballService")
 @patch("src.bot.jobs.football.get_subscribers")
-async def test_send_match_notifications(mock_get_subscribers, mock_service_class):
+async def test_send_match_notifications(
+    mock_get_subscribers, mock_service_class, mock_zaruba_service_class
+):
     """Test sending notifications to subscribers."""
     # Setup mock service
     mock_service = MagicMock()
     mock_service_class.return_value = mock_service
+    mock_zaruba_service = MagicMock()
+    mock_zaruba_service.get_session.return_value = None
+    mock_zaruba_service_class.return_value = mock_zaruba_service
 
     # Create mock match objects
     from src.bot.models.match import Match
@@ -118,15 +124,70 @@ async def test_send_match_notifications(mock_get_subscribers, mock_service_class
     await send_match_notifications(fake_context)
 
     assert bot_mock.send_message.call_count == 2
+    assert mock_zaruba_service.create_zaruba.call_count == 2
 
 
 @pytest.mark.asyncio
+@patch("src.bot.jobs.football.ZarubaService")
 @patch("src.bot.jobs.football.FootballService")
 @patch("src.bot.jobs.football.get_subscribers")
-async def test_send_match_notifications_no_subscribers(mock_get_subscribers, mock_service_class):
+async def test_send_match_notifications_same_time_sets_zaruba_time(
+    mock_get_subscribers, mock_service_class, mock_zaruba_service_class
+):
+    """Test that a shared match time is used for zaruba registration."""
+    mock_service = MagicMock()
+    mock_service_class.return_value = mock_service
+    mock_service.format_match_time.return_value = "20:00 MSC"
+
+    async def async_get_big_matches():
+        from src.bot.models.match import Match
+        return [
+            Match(
+                league="Premier League",
+                home_team="Team A",
+                away_team="Team B",
+                utc_date="2025-02-14T19:00:00Z",
+            ),
+            Match(
+                league="Premier League",
+                home_team="Team C",
+                away_team="Team D",
+                utc_date="2025-02-14T19:00:00Z",
+            ),
+        ]
+
+    mock_service.get_big_matches = async_get_big_matches
+
+    mock_get_subscribers.return_value = [123456789]
+
+    application_mock = AsyncMock()
+    bot_mock = AsyncMock()
+    application_mock.bot = bot_mock
+
+    mock_zaruba_service = MagicMock()
+    mock_zaruba_service.get_session.return_value = None
+    mock_zaruba_service_class.return_value = mock_zaruba_service
+
+    fake_context = AsyncMock()
+    fake_context.job.data = application_mock
+
+    await send_match_notifications(fake_context)
+
+    mock_zaruba_service.create_zaruba.assert_called_once()
+    _, kwargs = mock_zaruba_service.create_zaruba.call_args
+    assert kwargs["time"] == "20:00 MSC"
+
+@pytest.mark.asyncio
+@patch("src.bot.jobs.football.ZarubaService")
+@patch("src.bot.jobs.football.FootballService")
+@patch("src.bot.jobs.football.get_subscribers")
+async def test_send_match_notifications_no_subscribers(
+    mock_get_subscribers, mock_service_class, mock_zaruba_service_class
+):
     """Test that no notifications are sent if there are no subscribers."""
     mock_service = MagicMock()
     mock_service_class.return_value = mock_service
+    mock_zaruba_service_class.return_value = MagicMock()
 
     async def async_get_big_matches():
         return []
@@ -147,12 +208,16 @@ async def test_send_match_notifications_no_subscribers(mock_get_subscribers, moc
 
 
 @pytest.mark.asyncio
+@patch("src.bot.jobs.football.ZarubaService")
 @patch("src.bot.jobs.football.FootballService")
 @patch("src.bot.jobs.football.get_subscribers")
-async def test_send_match_notifications_no_matches(mock_get_subscribers, mock_service_class):
-    """Test that no notifications are sent if there are no big matches."""
+async def test_send_match_notifications_no_matches(
+    mock_get_subscribers, mock_service_class, mock_zaruba_service_class
+):
+    """Test that a placeholder notification is sent if there are no big matches."""
     mock_service = MagicMock()
     mock_service_class.return_value = mock_service
+    mock_zaruba_service_class.return_value = MagicMock()
 
     async def async_get_big_matches():
         return []
@@ -169,4 +234,4 @@ async def test_send_match_notifications_no_matches(mock_get_subscribers, mock_se
 
     await send_match_notifications(fake_context)
 
-    bot_mock.send_message.assert_not_called()
+    bot_mock.send_message.assert_called_once()
