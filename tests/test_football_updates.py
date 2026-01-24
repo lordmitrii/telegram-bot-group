@@ -208,16 +208,12 @@ async def test_send_match_notifications_no_subscribers(
 
 
 @pytest.mark.asyncio
-@patch("src.bot.jobs.football.ZarubaService")
 @patch("src.bot.jobs.football.FootballService")
 @patch("src.bot.jobs.football.get_subscribers")
-async def test_send_match_notifications_no_matches(
-    mock_get_subscribers, mock_service_class, mock_zaruba_service_class
-):
-    """Test that a placeholder notification is sent if there are no big matches."""
+async def test_send_match_notifications_no_matches(mock_get_subscribers, mock_service_class):
+    """Test that no notifications are sent if there are no big matches."""
     mock_service = MagicMock()
     mock_service_class.return_value = mock_service
-    mock_zaruba_service_class.return_value = MagicMock()
 
     async def async_get_big_matches():
         return []
@@ -234,4 +230,4 @@ async def test_send_match_notifications_no_matches(
 
     await send_match_notifications(fake_context)
 
-    bot_mock.send_message.assert_called_once()
+    bot_mock.send_message.assert_not_called()
