@@ -12,7 +12,7 @@ from src.bot.jobs.seasonal import schedule_new_year_message
 def schedule_all_jobs(application: Application) -> None:
     """Schedule all recurring jobs."""
     schedule_football_updates(application)
-    schedule_scraper_polling(application)
+    # schedule_scraper_polling(application)
     schedule_new_year_message(application)
     logging.info("Scheduled jobs: football updates, scrapers, seasonal messages.")
 
