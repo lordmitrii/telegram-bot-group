@@ -2,16 +2,19 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-COPY config.json .
-COPY . .
+# Install dependencies first for better caching
+COPY pyproject.toml .
+RUN pip install --no-cache-dir .
 
+# Copy source code
+COPY src/ src/
+COPY data/ data/
+
+# Environment variables
 ARG TOKEN
 ENV TOKEN=${TOKEN}
 
 ARG FOOTBALL_API_KEY
 ENV FOOTBALL_API_KEY=${FOOTBALL_API_KEY}
 
-RUN pip install --no-cache-dir -r requirements.txt
-
-CMD ["python", "main.py"]
+CMD ["telegram-bot"]
