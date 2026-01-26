@@ -58,5 +58,9 @@ MESSAGES = {
     "football_zaruba_cta": (
         "📺 Собираемся на футбол, братва! Регистрация на зарубу — /reg"
     ),
-    "football_time": "футбольное время 🕒"
+    "football_time": "футбольное время 🕒",
+
+    "beer_check_button": "Ты в пиве?",
+    "beer_check_yes": "Да",
+    "beer_check_no": "Да пашел ты",
 }

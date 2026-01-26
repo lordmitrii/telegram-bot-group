@@ -4,7 +4,7 @@ from typing import List
 
 from telegram.ext import BaseHandler, CommandHandler, MessageHandler, filters
 
-from src.bot.handlers.base import start, help_command, unknown
+from src.bot.handlers.base import beer_check_text, start, help_command, unknown
 from src.bot.handlers import football as football_handlers
 from src.bot.handlers import zaruba as zaruba_handlers
 
@@ -22,6 +22,7 @@ def get_handlers() -> List[BaseHandler]:
         CommandHandler("subscribe", football_handlers.subscribe),
         CommandHandler("unsubscribe", football_handlers.unsubscribe),
         CommandHandler("stats", zaruba_handlers.zaruba_stats),
+        MessageHandler(filters.Regex("^Ты в пиве\\?$"), beer_check_text),
         MessageHandler(filters.COMMAND, unknown),
     ]
 
