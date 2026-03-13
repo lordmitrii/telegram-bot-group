@@ -26,6 +26,12 @@ class Settings(BaseSettings):
         validation_alias="FOOTBALL_API_URL",
     )
 
+    # Holiday notifications
+    holiday_source_url: str = Field(
+        default="https://www.daysoftheyear.com/today/",
+        validation_alias="HOLIDAY_SOURCE_URL",
+    )
+
     # Scraper
     scraper_poll_interval: int = Field(
         default=300, validation_alias="SCRAPER_POLL_INTERVAL"
