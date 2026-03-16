@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import datetime
 from html.parser import HTMLParser
 import logging
 import re
@@ -11,108 +12,125 @@ from typing import List, Optional
 import requests
 
 from src.bot.core.config import get_settings
+from src.bot.core.constants import MOSCOW_TZ
+
+_RU_MONTHS = {
+    1: "января",
+    2: "февраля",
+    3: "марта",
+    4: "апреля",
+    5: "мая",
+    6: "июня",
+    7: "июля",
+    8: "августа",
+    9: "сентября",
+    10: "октября",
+    11: "ноября",
+    12: "декабря",
+}
 
 
 @dataclass(slots=True)
 class Holiday:
-    """Represents a holiday item scraped from the source page."""
+    """Represents a holiday scraped from Calend.ru."""
 
     title: str
     description: str
 
 
-class _TodayHolidayHTMLParser(HTMLParser):
-    """Extract holiday cards from daysoftheyear.com/today/."""
+class _CalendDayHTMLParser(HTMLParser):
+    """Collect cleaned text tokens from a Calend.ru day page."""
 
     def __init__(self) -> None:
         super().__init__()
-        self._capture_title = False
-        self._awaiting_description = False
-        self._current_title: List[str] = []
-        self._current_description: List[str] = []
-        self.holidays: List[Holiday] = []
+        self._ignored_depth = 0
+        self.tokens: List[str] = []
 
     def handle_starttag(self, tag: str, attrs: List[tuple[str, Optional[str]]]) -> None:
-        if tag == "h3":
-            self._flush_holiday()
-            self._capture_title = True
-            self._awaiting_description = False
-            self._current_title = []
-            self._current_description = []
+        if tag in {"script", "style"}:
+            self._ignored_depth += 1
 
     def handle_endtag(self, tag: str) -> None:
-        if tag == "h3":
-            self._capture_title = False
-            self._awaiting_description = bool(self._current_title)
-
-        if tag in {"h2", "section", "article", "li"}:
-            self._flush_holiday()
+        if tag in {"script", "style"} and self._ignored_depth:
+            self._ignored_depth -= 1
 
     def handle_data(self, data: str) -> None:
+        if self._ignored_depth:
+            return
+
         cleaned = _clean_text(data)
         if not cleaned:
             return
 
-        if self._capture_title:
-            self._current_title.append(cleaned)
+        if self.tokens and self.tokens[-1] == cleaned:
             return
 
-        if self._awaiting_description and self._looks_like_description(cleaned):
-            self._current_description.append(cleaned)
-            self._flush_holiday()
-
-    def _flush_holiday(self) -> None:
-        if not self._current_title or not self._current_description:
-            return
-
-        title = _clean_text(" ".join(self._current_title))
-        description = _clean_text(" ".join(self._current_description))
-        if not title or not description:
-            return
-
-        if any(existing.title == title for existing in self.holidays):
-            return
-
-        self.holidays.append(Holiday(title=title, description=description))
-        self._current_title = []
-        self._current_description = []
-        self._awaiting_description = False
-
-    def close(self) -> None:
-        """Flush the last parsed holiday before closing."""
-        self._flush_holiday()
-        super().close()
-
-    @staticmethod
-    def _looks_like_description(value: str) -> bool:
-        """Filter out dates and layout text between heading and description."""
-        lowered = value.lower()
-        if lowered.startswith(("mon ", "tue ", "wed ", "thu ", "fri ", "sat ", "sun ")):
-            return False
-        if lowered.startswith("image:"):
-            return False
-        if value.endswith("..."):
-            return False
-        return len(value) >= 20
+        self.tokens.append(cleaned)
 
 
 def _clean_text(value: str) -> str:
     """Normalize scraped text."""
-    without_tags = re.sub(r"\s+", " ", value)
-    return without_tags.strip()
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def _find_token_index(tokens: List[str], target: str, start: int = 0) -> int:
+    """Find a token index by exact match."""
+    for index in range(start, len(tokens)):
+        if tokens[index] == target:
+            return index
+    return -1
+
+
+def _looks_like_title(value: str) -> bool:
+    """Check whether a token looks like a holiday title."""
+    if len(value) < 5:
+        return False
+    if value.startswith("Image:"):
+        return False
+    if value.isdigit():
+        return False
+    if value in {"Праздники", "Международные праздники", "Праздники славян"}:
+        return False
+    if value.startswith(("Главная страница", "Адрес страницы:", "Сегодня", "Завтра")):
+        return False
+    if value.endswith("года") or "года," in value:
+        return False
+    return True
+
+
+def _looks_like_description(value: str, title: str) -> bool:
+    """Check whether a token looks like a holiday description."""
+    if value == title:
+        return False
+    if len(value) < 25:
+        return False
+    if value.startswith("Image:"):
+        return False
+    if value in {"Международные праздники", "Праздники славян"}:
+        return False
+    if value.endswith("..."):
+        return False
+    return True
 
 
 class HolidayService:
-    """Fetch today's holiday from the configured source."""
+    """Fetch today's holiday from Calend.ru."""
 
     def __init__(self) -> None:
         self._settings = get_settings()
 
     async def get_todays_holiday(self) -> Optional[Holiday]:
         """Return a single holiday for today."""
+        today = datetime.datetime.now(MOSCOW_TZ).date()
+        url = self._settings.holiday_source_url_template.format(
+            year=today.year,
+            month=today.month,
+            day=today.day,
+        )
+
         try:
             response = requests.get(
-                self._settings.holiday_source_url,
+                url,
                 timeout=15,
                 headers={
                     "User-Agent": (
@@ -125,16 +143,45 @@ class HolidayService:
             logging.error(f"Error fetching today's holiday: {exc}")
             return None
 
-        parser = _TodayHolidayHTMLParser()
+        parser = _CalendDayHTMLParser()
         parser.feed(response.text)
-        parser.close()
-
-        for holiday in parser.holidays:
-            if len(holiday.title) < 3 or len(holiday.description) < 20:
-                continue
+        holiday = self._extract_holiday(parser.tokens, today)
+        if holiday is not None:
             return holiday
 
         logging.warning("Could not parse any holiday items from source page.")
+        return None
+
+    def _extract_holiday(
+        self, tokens: List[str], today: datetime.date
+    ) -> Optional[Holiday]:
+        """Extract the first holiday title and description from parsed tokens."""
+        date_heading = f"{today.day} {_RU_MONTHS[today.month]} {today.year} года"
+        section_start = _find_token_index(tokens, date_heading)
+        if section_start == -1:
+            return None
+
+        holidays_heading = _find_token_index(tokens, "Праздники", start=section_start)
+        if holidays_heading == -1:
+            return None
+
+        title = None
+        description = None
+        for token in tokens[holidays_heading + 1 :]:
+            if token in {"Именины", "Хроника", "Народный календарь"}:
+                break
+
+            if title is None and _looks_like_title(token):
+                title = token
+                continue
+
+            if title is not None and _looks_like_description(token, title):
+                description = token
+                break
+
+        if title and description:
+            return Holiday(title=title, description=description)
+
         return None
 
 

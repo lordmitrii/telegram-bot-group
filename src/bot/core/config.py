@@ -27,9 +27,9 @@ class Settings(BaseSettings):
     )
 
     # Holiday notifications
-    holiday_source_url: str = Field(
-        default="https://www.daysoftheyear.com/today/",
-        validation_alias="HOLIDAY_SOURCE_URL",
+    holiday_source_url_template: str = Field(
+        default="https://www.calend.ru/day/{year}-{month}-{day}/",
+        validation_alias="HOLIDAY_SOURCE_URL_TEMPLATE",
     )
 
     # Scraper

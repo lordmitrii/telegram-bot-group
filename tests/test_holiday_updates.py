@@ -1,8 +1,10 @@
 """Tests for holiday service and daily notifications."""
 
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import pytz
 
 from src.bot.jobs.holiday import send_holiday_notifications
 from src.bot.services.holiday import Holiday, get_todays_holiday
@@ -17,23 +19,26 @@ async def test_get_todays_holiday_success(mock_get):
     mock_response.text = """
         <html>
             <body>
-                <section>
-                    <h3>International Women's Day</h3>
-                    <p>A global day celebrating the social, economic, cultural, and political achievements of women.</p>
-                </section>
+                <h1>17 марта 2026 года</h1>
+                <div>Праздники</div>
+                <div>Всемирный день социальной работы</div>
+                <div>2026</div>
+                <div>«Всемирный день социальной работы» отмечается в 3-й вторник марта.</div>
+                <div>Международные праздники</div>
+                <div>Каждый год в третий вторник марта отмечается Всемирный день социальной работы.</div>
             </body>
         </html>
     """
     mock_get.return_value = mock_response
 
-    holiday = await get_todays_holiday()
+    fake_now = datetime(2026, 3, 17, 12, 0, tzinfo=pytz.timezone("Europe/Moscow"))
+    with patch("src.bot.services.holiday.datetime.datetime") as mock_datetime:
+        mock_datetime.now.return_value = fake_now
+        holiday = await get_todays_holiday()
 
     assert holiday == Holiday(
-        title="International Women's Day",
-        description=(
-            "A global day celebrating the social, economic, cultural, "
-            "and political achievements of women."
-        ),
+        title="Всемирный день социальной работы",
+        description="«Всемирный день социальной работы» отмечается в 3-й вторник марта.",
     )
 
 
