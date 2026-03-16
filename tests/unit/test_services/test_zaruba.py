@@ -207,7 +207,6 @@ def test_botinok_requires_two_unique_votes(test_db):
         user_repo=UserIdentityRepository(test_db),
     )
 
-    service.create_zaruba(chat_id=123, time="18:00", creator=make_user(1, "creator"))
     service.track_user(123, make_user(10, "target"))
 
     votes, fine_applied, already_voted = service.register_botinok_vote(123, "voter1", "target")

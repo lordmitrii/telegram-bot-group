@@ -35,9 +35,9 @@ async def test_zaruba_command(test_db):
 
     await zaruba_handlers.zaruba(update, context)
 
-    update.message.reply_text.assert_called_once_with(
-        MESSAGES["zaruba_created"].format(time="18:00")
-    )
+    args, kwargs = update.message.reply_text.call_args
+    assert args == (MESSAGES["zaruba_created"].format(time="18:00"),)
+    assert kwargs["reply_markup"] is not None
 
 
 @pytest.mark.asyncio
@@ -172,20 +172,15 @@ async def test_botinok_vote_and_fine(test_db):
     update.effective_chat.id = 123456
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
-    context.args = ["18:00"]
-
-    await zaruba_handlers.zaruba(update, context)
-
-    update.message.reply_text.reset_mock()
     context.args = ["@target"]
     update.effective_user.username = "voter1"
     update.effective_user.id = 2
 
     await zaruba_handlers.botinok(update, context)
 
-    update.message.reply_text.assert_called_once_with(
-        MESSAGES["botinok_vote"].format(target="target", votes=1)
-    )
+    args, kwargs = update.message.reply_text.call_args
+    assert args == (MESSAGES["botinok_vote"].format(target="target", votes=1),)
+    assert kwargs["reply_markup"] is not None
 
     update.message.reply_text.reset_mock()
     update.effective_user.username = "voter2"
@@ -201,6 +196,123 @@ async def test_botinok_vote_and_fine(test_db):
 
     await zaruba_handlers.botinok(update, context)
 
-    update.message.reply_text.assert_called_once_with(
-        MESSAGES["botinok_vote"].format(target="target", votes=1)
+    args, kwargs = update.message.reply_text.call_args
+    assert args == (MESSAGES["botinok_vote"].format(target="target", votes=1),)
+    assert kwargs["reply_markup"] is not None
+
+
+@pytest.mark.asyncio
+async def test_botinok_callback_fines_and_edits_message(test_db):
+    """Inline botinok button should allow the second vote without typing the command again."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
+    update.effective_user.username = "creator"
+    update.effective_user.first_name = "Creator"
+    update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["@target"]
+    update.effective_user.id = 2
+    update.effective_user.username = "voter1"
+    update.effective_user.first_name = "Voter1"
+
+    await zaruba_handlers.botinok(update, context)
+
+    callback_update = AsyncMock()
+    callback_update.effective_chat.id = 123456
+    callback_update.effective_user = AsyncMock(spec=User)
+    callback_update.effective_user.id = 3
+    callback_update.effective_user.username = "voter2"
+    callback_update.effective_user.first_name = "Voter2"
+    callback_update.callback_query = AsyncMock()
+    callback_update.callback_query.data = "botinok:target"
+    callback_update.callback_query.answer = AsyncMock()
+    callback_update.callback_query.edit_message_text = AsyncMock()
+
+    await zaruba_handlers.botinok_callback(callback_update, context)
+
+    callback_update.callback_query.answer.assert_called_once_with()
+    callback_update.callback_query.edit_message_text.assert_called_once_with(
+        MESSAGES["botinok_fined"].format(target="target")
+    )
+
+
+@pytest.mark.asyncio
+async def test_zaruba_callback_reg(test_db):
+    """Inline zaruba register button should register without typing /reg."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
+    update.effective_user.username = "creator"
+    update.effective_user.first_name = "Creator"
+    update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["18:00"]
+
+    await zaruba_handlers.zaruba(update, context)
+
+    callback_update = AsyncMock()
+    callback_update.effective_chat.id = 123456
+    callback_update.effective_user = AsyncMock(spec=User)
+    callback_update.effective_user.id = 2
+    callback_update.effective_user.username = "new_user"
+    callback_update.effective_user.first_name = "New"
+    callback_update.callback_query = AsyncMock()
+    callback_update.callback_query.data = "zaruba:reg"
+    callback_update.callback_query.answer = AsyncMock()
+    callback_update.callback_query.message = AsyncMock(spec=Message)
+    callback_update.callback_query.message.reply_text = AsyncMock()
+
+    await zaruba_handlers.zaruba_callback(callback_update, context)
+
+    callback_update.callback_query.answer.assert_called_once_with()
+    callback_update.callback_query.message.reply_text.assert_called_once_with(
+        MESSAGES["reg_success"].format(user="new_user", time="18:00")
+    )
+
+
+@pytest.mark.asyncio
+async def test_zaruba_callback_cancel_removes_buttons(test_db):
+    """Inline zaruba cancel button should cancel and clear inline markup."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
+    update.effective_user.username = "creator"
+    update.effective_user.first_name = "Creator"
+    update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["18:00"]
+
+    await zaruba_handlers.zaruba(update, context)
+
+    callback_update = AsyncMock()
+    callback_update.effective_chat.id = 123456
+    callback_update.effective_user = AsyncMock(spec=User)
+    callback_update.effective_user.id = 1
+    callback_update.effective_user.username = "creator"
+    callback_update.effective_user.first_name = "Creator"
+    callback_update.callback_query = AsyncMock()
+    callback_update.callback_query.data = "zaruba:cancel"
+    callback_update.callback_query.answer = AsyncMock()
+    callback_update.callback_query.edit_message_reply_markup = AsyncMock()
+    callback_update.callback_query.message = AsyncMock(spec=Message)
+    callback_update.callback_query.message.reply_text = AsyncMock()
+
+    await zaruba_handlers.zaruba_callback(callback_update, context)
+
+    callback_update.callback_query.answer.assert_called_once_with()
+    callback_update.callback_query.edit_message_reply_markup.assert_called_once_with(
+        reply_markup=None
+    )
+    callback_update.callback_query.message.reply_text.assert_called_once_with(
+        MESSAGES["cancel_success"]
     )

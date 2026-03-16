@@ -1,6 +1,6 @@
 """Zaruba command handlers."""
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from src.bot.core.exceptions import NoActiveZarubaError, StatsNotFoundError
@@ -10,6 +10,8 @@ from src.bot.services.zaruba import ZarubaService
 
 # Service instance (will be initialized on first use)
 _zaruba_service = None
+_BOTINOK_CALLBACK_PREFIX = "botinok:"
+_ZARUBA_CALLBACK_PREFIX = "zaruba:"
 
 
 def _get_service() -> ZarubaService:
@@ -43,6 +45,46 @@ def _get_chat_user(update: Update) -> ChatUser | None:
     )
 
 
+def _get_botinok_markup(target_username: str) -> InlineKeyboardMarkup:
+    """Build inline voting markup for a botinok target."""
+    return InlineKeyboardMarkup(
+        [[
+            InlineKeyboardButton(
+                MESSAGES["botinok_button"].format(target=target_username),
+                callback_data=f"{_BOTINOK_CALLBACK_PREFIX}{target_username}",
+            )
+        ]]
+    )
+
+
+def _get_zaruba_markup() -> InlineKeyboardMarkup:
+    """Build inline action buttons for the active zaruba message."""
+    return InlineKeyboardMarkup(
+        [[
+            InlineKeyboardButton(
+                MESSAGES["zaruba_button_reg"],
+                callback_data=f"{_ZARUBA_CALLBACK_PREFIX}reg",
+            ),
+            InlineKeyboardButton(
+                MESSAGES["zaruba_button_unreg"],
+                callback_data=f"{_ZARUBA_CALLBACK_PREFIX}unreg",
+            ),
+            InlineKeyboardButton(
+                MESSAGES["zaruba_button_cancel"],
+                callback_data=f"{_ZARUBA_CALLBACK_PREFIX}cancel",
+            ),
+        ]]
+    )
+
+
+def _is_zaruba_creator(session, user: ChatUser) -> bool:
+    """Check whether the user created the current zaruba."""
+    if not session.registered_users:
+        return False
+    creator_username = next(iter(session.registered_users))
+    return creator_username == user.display_name
+
+
 async def zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /zaruba command to create a new event."""
     user = _get_chat_user(update)
@@ -60,7 +102,10 @@ async def zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     service = _get_service()
     service.create_zaruba(chat_id, time, user)
 
-    await update.message.reply_text(MESSAGES["zaruba_created"].format(time=time))
+    await update.message.reply_text(
+        MESSAGES["zaruba_created"].format(time=time),
+        reply_markup=_get_zaruba_markup(),
+    )
 
 
 async def reg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -186,15 +231,11 @@ async def botinok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     chat_id = update.effective_chat.id
     service = _get_service()
-    try:
-        votes, fine_applied, already_voted = service.register_botinok_vote(
-            chat_id,
-            user.display_name,
-            target_username,
-        )
-    except NoActiveZarubaError:
-        await update.message.reply_text(MESSAGES["no_zaruba"])
-        return
+    votes, fine_applied, already_voted = service.register_botinok_vote(
+        chat_id,
+        user.display_name,
+        target_username,
+    )
 
     if already_voted:
         await update.message.reply_text(
@@ -212,8 +253,145 @@ async def botinok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     await update.message.reply_text(
-        MESSAGES["botinok_vote"].format(target=target_username, votes=votes)
+        MESSAGES["botinok_vote"].format(target=target_username, votes=votes),
+        reply_markup=_get_botinok_markup(target_username),
     )
+
+
+async def botinok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle inline botinok votes."""
+    query = update.callback_query
+    if query is None or not query.data.startswith(_BOTINOK_CALLBACK_PREFIX):
+        return
+
+    user = _get_chat_user(update)
+    if not user:
+        await query.answer(MESSAGES["zaruba_no_username"], show_alert=True)
+        return
+
+    target_username = query.data.removeprefix(_BOTINOK_CALLBACK_PREFIX)
+    if not target_username:
+        await query.answer(MESSAGES["botinok_no_target"], show_alert=True)
+        return
+    if target_username == user.display_name:
+        await query.answer(MESSAGES["botinok_self"], show_alert=True)
+        return
+
+    chat_id = update.effective_chat.id
+    service = _get_service()
+    votes, fine_applied, already_voted = service.register_botinok_vote(
+        chat_id,
+        user.display_name,
+        target_username,
+    )
+
+    if already_voted:
+        await query.answer(
+            MESSAGES["botinok_already_voted"].format(
+                user=user.display_name,
+                target=target_username,
+            ),
+            show_alert=True,
+        )
+        return
+
+    await query.answer()
+
+    if fine_applied:
+        await query.edit_message_text(MESSAGES["botinok_fined"].format(target=target_username))
+        return
+
+    await query.edit_message_text(
+        MESSAGES["botinok_vote"].format(target=target_username, votes=votes),
+        reply_markup=_get_botinok_markup(target_username),
+    )
+
+
+async def zaruba_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle inline zaruba action buttons."""
+    query = update.callback_query
+    if query is None or not query.data.startswith(_ZARUBA_CALLBACK_PREFIX):
+        return
+
+    user = _get_chat_user(update)
+    if not user:
+        await query.answer(MESSAGES["zaruba_no_username"], show_alert=True)
+        return
+
+    action = query.data.removeprefix(_ZARUBA_CALLBACK_PREFIX)
+    chat_id = update.effective_chat.id
+    service = _get_service()
+    session = service.get_session(chat_id)
+
+    if session is None:
+        await query.answer(MESSAGES["no_zaruba"], show_alert=True)
+        return
+
+    is_registered = user.display_name in session.registered_users
+    is_creator = _is_zaruba_creator(session, user)
+
+    if action == "reg":
+        if is_registered:
+            await query.answer(
+                MESSAGES["zaruba_action_only_unregistered_reg"],
+                show_alert=True,
+            )
+            return
+        try:
+            _, reg_time = service.register_user(chat_id, user)
+        except NoActiveZarubaError:
+            await query.answer(MESSAGES["no_zaruba"], show_alert=True)
+            return
+
+        await query.answer()
+        await query.message.reply_text(
+            MESSAGES["reg_success"].format(user=user.display_name, time=reg_time)
+        )
+        return
+
+    if action == "unreg":
+        if not is_registered:
+            await query.answer(
+                MESSAGES["zaruba_action_only_registered_unreg"],
+                show_alert=True,
+            )
+            return
+        if is_creator:
+            await query.answer(
+                MESSAGES["zaruba_action_only_creator_cancel"],
+                show_alert=True,
+            )
+            return
+        await query.answer()
+        if service.unregister_user(chat_id, user):
+            await query.message.reply_text(
+                MESSAGES["unreg_success"].format(user=user.display_name)
+            )
+        else:
+            await query.message.reply_text(
+                MESSAGES["unreg_not_found"].format(user=user.display_name)
+            )
+        return
+
+    if action == "cancel":
+        if not is_creator:
+            await query.answer(
+                MESSAGES["zaruba_action_only_creator_cancel"],
+                show_alert=True,
+            )
+            return
+        try:
+            service.cancel_zaruba(chat_id, user)
+        except NoActiveZarubaError:
+            await query.answer(MESSAGES["no_zaruba"], show_alert=True)
+            return
+
+        await query.answer()
+        await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(MESSAGES["cancel_success"])
+        return
+
+    await query.answer()
 
 
 async def zaruba_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -118,6 +118,15 @@ def init_db(db_path: Optional[str] = None) -> None:
         ON user_identities (chat_id, username)
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS botinok_votes (
+            chat_id INTEGER,
+            target_username TEXT,
+            voter_username TEXT,
+            PRIMARY KEY (chat_id, target_username, voter_username)
+        )
+    """)
+
     cursor.execute("PRAGMA table_info(zaruba_sessions)")
     existing_columns = {row[1] for row in cursor.fetchall()}
     required_columns = {

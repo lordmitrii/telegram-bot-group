@@ -9,6 +9,7 @@ from src.bot.models.aura import UserAura
 from src.bot.models.user import ChatUser
 from src.bot.models.zaruba import ZarubaSession, ZarubaStats
 from src.bot.repositories.aura import AuraRepository, get_aura_repo
+from src.bot.repositories.botinok import BotinokVoteRepository, get_botinok_repo
 from src.bot.repositories.session import SessionRepository, get_session_repo
 from src.bot.repositories.user_identity import (
     UserIdentityRepository,
@@ -25,11 +26,13 @@ class ZarubaService:
         session_repo: Optional[SessionRepository] = None,
         stats_repo: Optional[ZarubaStatsRepository] = None,
         aura_repo: Optional[AuraRepository] = None,
+        botinok_repo: Optional[BotinokVoteRepository] = None,
         user_repo: Optional[UserIdentityRepository] = None,
     ):
         self._session_repo = session_repo or get_session_repo()
         self._stats_repo = stats_repo or ZarubaStatsRepository()
         self._aura_repo = aura_repo or get_aura_repo()
+        self._botinok_repo = botinok_repo or get_botinok_repo()
         self._user_repo = user_repo or get_user_identity_repo()
 
     def track_user(self, chat_id: int, user: ChatUser) -> None:
@@ -269,31 +272,26 @@ class ZarubaService:
         target_username: str,
     ) -> Tuple[int, bool, bool]:
         """Register a /botinok vote and fine the target after two unique votes."""
-        session = self._session_repo.get_session(chat_id)
-        if session is None:
-            raise NoActiveZarubaError()
+        if self._botinok_repo.has_vote(chat_id, target_username, voter_username):
+            current_votes = self._botinok_repo.add_vote(
+                chat_id, target_username, voter_username
+            )
+            return current_votes, False, True
 
-        votes = set(session.botinok_votes.get(target_username, []))
-        if voter_username in votes:
-            return len(votes), False, True
-
-        votes.add(voter_username)
-        session.botinok_votes[target_username] = sorted(votes)
+        votes = self._botinok_repo.add_vote(chat_id, target_username, voter_username)
 
         fine_applied = False
-        if len(votes) >= 2 and target_username not in session.fined_users:
+        if votes >= 2:
             target_user = self._user_repo.get_by_username(chat_id, target_username)
             target_user_id = target_user.user_id if target_user else None
             target_name = target_user.display_name if target_user else target_username
             self._aura_repo.change_points(
                 chat_id, target_name, -1000, user_id=target_user_id
             )
-            session.fined_users.append(target_username)
-            session.botinok_votes.pop(target_username, None)
+            self._botinok_repo.clear_votes(chat_id, target_username)
             fine_applied = True
 
-        self._session_repo.save_session(session)
-        return len(votes), fine_applied, False
+        return votes, fine_applied, False
 
     def evaluate_user_reliability(
         self,
