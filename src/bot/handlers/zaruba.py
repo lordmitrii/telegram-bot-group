@@ -259,12 +259,16 @@ async def zaruba_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
     is_reliable, chance = service.evaluate_user_reliability(stats)
+    reliability_label = (
+        MESSAGES["stats_good_label"] if is_reliable else MESSAGES["stats_bad_label"]
+    )
+    aura_label = service.get_aura_verdict_label(chat_id, aura.aura_points)
 
-    if is_reliable:
-        await update.message.reply_text(
-            MESSAGES["stats_good"].format(chance=chance), parse_mode="Markdown"
-        )
-    else:
-        await update.message.reply_text(
-            MESSAGES["stats_bad"].format(chance=chance), parse_mode="Markdown"
-        )
+    await update.message.reply_text(
+        MESSAGES["stats_verdict_combined"].format(
+            reliability=reliability_label,
+            aura=aura_label,
+            chance=chance,
+        ),
+        parse_mode="Markdown",
+    )

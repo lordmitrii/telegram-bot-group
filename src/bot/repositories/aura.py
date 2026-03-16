@@ -10,6 +10,23 @@ from src.bot.repositories.base import BaseRepository
 class AuraRepository(BaseRepository):
     """Repository for user aura operations."""
 
+    def get_max_aura_points(self, chat_id: int) -> int | None:
+        """Get the highest aura value recorded in a chat."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT MAX(aura_points) FROM ("
+                "SELECT aura_points FROM user_aura WHERE chat_id = ? "
+                "UNION ALL "
+                "SELECT aura_points FROM user_aura_by_id WHERE chat_id = ?"
+                ")",
+                (chat_id, chat_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return None
+            return row[0]
+
     def _migrate_legacy_aura(self, chat_id: int, user: ChatUser) -> None:
         """Copy matching legacy aura into the stable-ID table when possible."""
         with self.get_connection() as conn:

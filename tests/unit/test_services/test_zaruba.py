@@ -219,7 +219,28 @@ def test_botinok_requires_two_unique_votes(test_db):
     assert service.get_user_aura(123, user_id=10, username="target").aura_points == -1000
 
     votes, fine_applied, already_voted = service.register_botinok_vote(123, "voter2", "target")
-    assert (votes, fine_applied, already_voted) == (2, False, True)
+    assert (votes, fine_applied, already_voted) == (1, False, False)
+
+
+def test_get_aura_verdict(test_db):
+    """Aura verdict should reflect sign and highest aura in chat."""
+    service = ZarubaService(
+        session_repo=SessionRepository(test_db),
+        stats_repo=ZarubaStatsRepository(test_db),
+        aura_repo=AuraRepository(test_db),
+        user_repo=UserIdentityRepository(test_db),
+    )
+
+    service.track_user(123, make_user(1, "top_user"))
+    service.track_user(123, make_user(2, "minus_user"))
+    service.track_user(123, make_user(3, "plus_user"))
+    service._aura_repo.change_points(123, "top_user", 500, user_id=1)
+    service._aura_repo.change_points(123, "minus_user", -5, user_id=2)
+    service._aura_repo.change_points(123, "plus_user", 10, user_id=3)
+
+    assert service.get_aura_verdict(123, 500) == "*Вердикт*: Невероятная аура"
+    assert service.get_aura_verdict(123, -5) == "*Вердикт*: негативная аура"
+    assert service.get_aura_verdict(123, 10) == "*Вердикт*: позитивная аура"
 
 
 def test_stats_and_aura_persist_across_username_change(test_db):

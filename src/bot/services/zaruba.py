@@ -4,6 +4,7 @@ from typing import Dict, Optional, Tuple
 
 from src.bot.core.constants import BAD_THRESHOLD
 from src.bot.core.exceptions import NoActiveZarubaError, StatsNotFoundError
+from src.bot.i18n.messages import MESSAGES
 from src.bot.models.aura import UserAura
 from src.bot.models.user import ChatUser
 from src.bot.models.zaruba import ZarubaSession, ZarubaStats
@@ -215,6 +216,24 @@ class ZarubaService:
                 )
         return self._aura_repo.get_aura(chat_id, label)
 
+    def get_aura_verdict(self, chat_id: int, aura_points: int) -> str:
+        """Get the text verdict for a user's aura in a chat."""
+        max_aura = self._aura_repo.get_max_aura_points(chat_id)
+        if max_aura is not None and aura_points == max_aura and aura_points > 0:
+            return MESSAGES["stats_aura_incredible"]
+        if aura_points < 0:
+            return MESSAGES["stats_aura_negative"]
+        return MESSAGES["stats_aura_positive"]
+
+    def get_aura_verdict_label(self, chat_id: int, aura_points: int) -> str:
+        """Get the short aura verdict label for combined stats output."""
+        max_aura = self._aura_repo.get_max_aura_points(chat_id)
+        if max_aura is not None and aura_points == max_aura and aura_points > 0:
+            return MESSAGES["stats_aura_incredible_label"]
+        if aura_points < 0:
+            return MESSAGES["stats_aura_negative_label"]
+        return MESSAGES["stats_aura_positive_label"]
+
     def apply_absence_penalties(
         self,
         chat_id: int,
@@ -270,6 +289,7 @@ class ZarubaService:
                 chat_id, target_name, -1000, user_id=target_user_id
             )
             session.fined_users.append(target_username)
+            session.botinok_votes.pop(target_username, None)
             fine_applied = True
 
         self._session_repo.save_session(session)

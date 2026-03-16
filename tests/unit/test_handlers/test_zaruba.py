@@ -196,3 +196,11 @@ async def test_botinok_vote_and_fine(test_db):
     update.message.reply_text.assert_called_once_with(
         MESSAGES["botinok_fined"].format(target="target")
     )
+
+    update.message.reply_text.reset_mock()
+
+    await zaruba_handlers.botinok(update, context)
+
+    update.message.reply_text.assert_called_once_with(
+        MESSAGES["botinok_vote"].format(target="target", votes=1)
+    )
