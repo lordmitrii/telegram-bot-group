@@ -19,7 +19,8 @@ class SessionRepository(BaseRepository):
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT chat_id, zaruba_time, registered_users, created_at "
+                "SELECT chat_id, zaruba_time, registered_users, botinok_votes, "
+                "fined_users, absence_penalties, created_at "
                 "FROM zaruba_sessions WHERE chat_id = ?",
                 (chat_id,),
             )
@@ -27,12 +28,44 @@ class SessionRepository(BaseRepository):
             if row is None:
                 return None
             registered_users = json.loads(row[2]) if row[2] else {}
+            botinok_votes = json.loads(row[3]) if row[3] else {}
+            fined_users = json.loads(row[4]) if row[4] else []
+            absence_penalties = json.loads(row[5]) if row[5] else []
             return ZarubaSession(
                 chat_id=row[0],
                 zaruba_time=row[1],
                 registered_users=registered_users,
-                created_at=row[3],
+                botinok_votes=botinok_votes,
+                fined_users=fined_users,
+                absence_penalties=absence_penalties,
+                created_at=row[6],
             )
+
+    def get_all_sessions(self) -> list[ZarubaSession]:
+        """Get all active zaruba sessions."""
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT chat_id, zaruba_time, registered_users, botinok_votes, "
+                "fined_users, absence_penalties, created_at "
+                "FROM zaruba_sessions"
+            )
+            rows = cursor.fetchall()
+
+        sessions: list[ZarubaSession] = []
+        for row in rows:
+            sessions.append(
+                ZarubaSession(
+                    chat_id=row[0],
+                    zaruba_time=row[1],
+                    registered_users=json.loads(row[2]) if row[2] else {},
+                    botinok_votes=json.loads(row[3]) if row[3] else {},
+                    fined_users=json.loads(row[4]) if row[4] else [],
+                    absence_penalties=json.loads(row[5]) if row[5] else [],
+                    created_at=row[6],
+                )
+            )
+        return sessions
 
     def create_session(
         self,
@@ -49,8 +82,16 @@ class SessionRepository(BaseRepository):
             cursor = conn.cursor()
             cursor.execute(
                 "INSERT OR REPLACE INTO zaruba_sessions "
-                "(chat_id, zaruba_time, registered_users) VALUES (?, ?, ?)",
-                (chat_id, zaruba_time, json.dumps(registered_users)),
+                "(chat_id, zaruba_time, registered_users, botinok_votes, fined_users, absence_penalties) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    chat_id,
+                    zaruba_time,
+                    json.dumps(registered_users),
+                    json.dumps({}),
+                    json.dumps([]),
+                    json.dumps([]),
+                ),
             )
 
         return ZarubaSession(
@@ -59,17 +100,21 @@ class SessionRepository(BaseRepository):
             registered_users=registered_users,
         )
 
-    def update_registered_users(
-        self,
-        chat_id: int,
-        registered_users: Dict[str, str],
-    ) -> None:
-        """Update the registered users for a session."""
+    def save_session(self, session: ZarubaSession) -> None:
+        """Persist mutable session state."""
         with self.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                "UPDATE zaruba_sessions SET registered_users = ? WHERE chat_id = ?",
-                (json.dumps(registered_users), chat_id),
+                "UPDATE zaruba_sessions "
+                "SET registered_users = ?, botinok_votes = ?, fined_users = ?, absence_penalties = ? "
+                "WHERE chat_id = ?",
+                (
+                    json.dumps(session.registered_users),
+                    json.dumps(session.botinok_votes),
+                    json.dumps(session.fined_users),
+                    json.dumps(session.absence_penalties),
+                    session.chat_id,
+                ),
             )
 
     def register_user(
@@ -86,7 +131,7 @@ class SessionRepository(BaseRepository):
         if session is None:
             return False
         session.registered_users[username] = time
-        self.update_registered_users(chat_id, session.registered_users)
+        self.save_session(session)
         return True
 
     def unregister_user(self, chat_id: int, username: str) -> bool:
@@ -100,7 +145,7 @@ class SessionRepository(BaseRepository):
         if username not in session.registered_users:
             return False
         del session.registered_users[username]
-        self.update_registered_users(chat_id, session.registered_users)
+        self.save_session(session)
         return True
 
     def delete_session(self, chat_id: int) -> bool:

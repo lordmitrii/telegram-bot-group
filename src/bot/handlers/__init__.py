@@ -18,6 +18,7 @@ def get_handlers() -> List[BaseHandler]:
         CommandHandler("unreg", zaruba_handlers.unreg),
         CommandHandler("list", zaruba_handlers.list_users),
         CommandHandler("cancel", zaruba_handlers.cancel_zaruba),
+        CommandHandler("botinok", zaruba_handlers.botinok),
         CommandHandler("help", help_command),
         CommandHandler("subscribe", football_handlers.subscribe),
         CommandHandler("unsubscribe", football_handlers.unsubscribe),

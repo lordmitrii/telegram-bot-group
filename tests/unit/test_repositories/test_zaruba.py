@@ -35,9 +35,10 @@ def test_zaruba_stats_repository_class(test_db):
     assert stats is None
 
     # Increment a counter
-    repo.increment_counter(chat_id=100, person_name="test_user", counter_type="initiate")
-    stats = repo.get_stats(chat_id=100, person_name="test_user")
+    repo.increment_counter(chat_id=100, person_name="test_user", counter_type="initiate", user_id=123)
+    stats = repo.get_stats(chat_id=100, person_name="test_user", user_id=123)
     assert stats is not None
+    assert stats.user_id == 123
     assert stats.zarub_initiated == 1
     assert stats.zarub_reg == 0
 

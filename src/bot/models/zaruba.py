@@ -12,6 +12,9 @@ class ZarubaSession:
     chat_id: int
     zaruba_time: str
     registered_users: Dict[str, str] = field(default_factory=dict)
+    botinok_votes: Dict[str, list[str]] = field(default_factory=dict)
+    fined_users: list[str] = field(default_factory=list)
+    absence_penalties: list[str] = field(default_factory=list)
     created_at: Optional[datetime] = None
 
 
@@ -21,6 +24,7 @@ class ZarubaStats:
 
     person_name: str
     chat_id: int
+    user_id: int | None = None
     zarub_initiated: int = 0
     zarub_reg: int = 0
     zarub_canceled: int = 0

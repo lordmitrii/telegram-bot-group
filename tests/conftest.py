@@ -47,6 +47,7 @@ def mock_update():
     update.message = AsyncMock(spec=Message)
     update.message.reply_text = AsyncMock()
     update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 42
     update.effective_user.username = "test_user"
     update.effective_user.first_name = "Test"
     update.effective_chat.id = 123456

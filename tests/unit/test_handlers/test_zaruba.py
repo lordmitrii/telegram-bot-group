@@ -24,6 +24,7 @@ async def test_zaruba_command(test_db):
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
     update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
     update.effective_user.username = "test_user"
     update.effective_user.first_name = "Test"
     update.message.reply_text = AsyncMock()
@@ -45,6 +46,7 @@ async def test_zaruba_command_no_time(test_db):
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
     update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
     update.effective_user.username = "test_user"
     update.message.reply_text = AsyncMock()
     update.effective_chat.id = 123456
@@ -64,6 +66,7 @@ async def test_reg_command(test_db):
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
     update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
     update.effective_user.username = "test_user"
     update.message.reply_text = AsyncMock()
     update.effective_chat.id = 123456
@@ -77,6 +80,7 @@ async def test_reg_command(test_db):
     update.message.reply_text.reset_mock()
     context.args = []
     update.effective_user.username = "new_user"
+    update.effective_user.id = 2
 
     await zaruba_handlers.reg(update, context)
 
@@ -91,6 +95,7 @@ async def test_reg_command_no_zaruba(test_db):
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
     update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
     update.effective_user.username = "test_user"
     update.message.reply_text = AsyncMock()
     update.effective_chat.id = 123456
@@ -110,6 +115,7 @@ async def test_cancel_zaruba(test_db):
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
     update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
     update.effective_user.username = "test_user"
     update.message.reply_text = AsyncMock()
     update.effective_chat.id = 123456
@@ -134,6 +140,7 @@ async def test_unreg(test_db):
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
     update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
     update.effective_user.username = "test_user"
     update.message.reply_text = AsyncMock()
     update.effective_chat.id = 123456
@@ -150,4 +157,42 @@ async def test_unreg(test_db):
 
     update.message.reply_text.assert_called_once_with(
         MESSAGES["unreg_success"].format(user="test_user")
+    )
+
+
+@pytest.mark.asyncio
+async def test_botinok_vote_and_fine(test_db):
+    """Two users voting with /botinok should fine the target."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
+    update.effective_user.username = "creator"
+    update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["18:00"]
+
+    await zaruba_handlers.zaruba(update, context)
+
+    update.message.reply_text.reset_mock()
+    context.args = ["@target"]
+    update.effective_user.username = "voter1"
+    update.effective_user.id = 2
+
+    await zaruba_handlers.botinok(update, context)
+
+    update.message.reply_text.assert_called_once_with(
+        MESSAGES["botinok_vote"].format(target="target", votes=1)
+    )
+
+    update.message.reply_text.reset_mock()
+    update.effective_user.username = "voter2"
+    update.effective_user.id = 3
+
+    await zaruba_handlers.botinok(update, context)
+
+    update.message.reply_text.assert_called_once_with(
+        MESSAGES["botinok_fined"].format(target="target")
     )
