@@ -85,6 +85,17 @@ def _is_zaruba_creator(session, user: ChatUser) -> bool:
     return creator_username == user.display_name
 
 
+def _format_zaruba_message(session) -> str:
+    """Render the zaruba message with the current registered users."""
+    response_text = (
+        f"{MESSAGES['zaruba_created'].format(time=session.zaruba_time)}\n\n"
+        f"{MESSAGES['list_registered']}\n"
+    )
+    for username, reg_time in session.registered_users.items():
+        response_text += MESSAGES["list_reg_yes"].format(user=username, time=reg_time)
+    return response_text
+
+
 async def zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle /zaruba command to create a new event."""
     user = _get_chat_user(update)
@@ -100,11 +111,12 @@ async def zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
 
     service = _get_service()
-    service.create_zaruba(chat_id, time, user)
+    session = service.create_zaruba(chat_id, time, user)
 
     await update.message.reply_text(
-        MESSAGES["zaruba_created"].format(time=time),
+        _format_zaruba_message(session),
         reply_markup=_get_zaruba_markup(),
+        parse_mode="Markdown",
     )
 
 
@@ -119,6 +131,12 @@ async def reg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     custom_time = " ".join(context.args) if context.args else None
 
     service = _get_service()
+    session = service.get_session(chat_id)
+    if session is not None and user.display_name in session.registered_users:
+        await update.message.reply_text(
+            MESSAGES["reg_already_registered"].format(user=user.display_name)
+        )
+        return
     try:
         _, reg_time = service.register_user(chat_id, user, custom_time)
         await update.message.reply_text(
@@ -138,6 +156,12 @@ async def unreg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
 
     service = _get_service()
+    session = service.get_session(chat_id)
+    if session is not None and _is_zaruba_creator(session, user):
+        await update.message.reply_text(
+            MESSAGES["unreg_creator_forbidden"].format(user=user.display_name)
+        )
+        return
     if service.unregister_user(chat_id, user):
         await update.message.reply_text(
             MESSAGES["unreg_success"].format(user=user.display_name)
@@ -203,6 +227,13 @@ async def cancel_zaruba(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     service = _get_service()
+    session = service.get_session(chat_id)
+    if session is None:
+        await update.message.reply_text(MESSAGES["no_zaruba"])
+        return
+    if not _is_zaruba_creator(session, user):
+        await update.message.reply_text(MESSAGES["zaruba_action_only_creator_cancel"])
+        return
     try:
         service.cancel_zaruba(chat_id, user)
         await update.message.reply_text(MESSAGES["cancel_success"])
@@ -344,8 +375,10 @@ async def zaruba_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
 
         await query.answer()
-        await query.message.reply_text(
-            MESSAGES["reg_success"].format(user=user.display_name, time=reg_time)
+        await query.edit_message_text(
+            _format_zaruba_message(service.get_session(chat_id)),
+            reply_markup=_get_zaruba_markup(),
+            parse_mode="Markdown",
         )
         return
 
@@ -358,18 +391,21 @@ async def zaruba_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
         if is_creator:
             await query.answer(
-                MESSAGES["zaruba_action_only_creator_cancel"],
+                MESSAGES["unreg_creator_forbidden"].format(user=user.display_name),
                 show_alert=True,
             )
             return
         await query.answer()
         if service.unregister_user(chat_id, user):
-            await query.message.reply_text(
-                MESSAGES["unreg_success"].format(user=user.display_name)
+            await query.edit_message_text(
+                _format_zaruba_message(service.get_session(chat_id)),
+                reply_markup=_get_zaruba_markup(),
+                parse_mode="Markdown",
             )
         else:
-            await query.message.reply_text(
-                MESSAGES["unreg_not_found"].format(user=user.display_name)
+            await query.answer(
+                MESSAGES["unreg_not_found"].format(user=user.display_name),
+                show_alert=True,
             )
         return
 
@@ -387,8 +423,7 @@ async def zaruba_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             return
 
         await query.answer()
-        await query.edit_message_reply_markup(reply_markup=None)
-        await query.message.reply_text(MESSAGES["cancel_success"])
+        await query.edit_message_text(MESSAGES["cancel_success"])
         return
 
     await query.answer()

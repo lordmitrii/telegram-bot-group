@@ -36,6 +36,8 @@ MESSAGES = {
     "zaruba_button_unreg": "🚫 Анрег",
     "zaruba_button_cancel": "🛑 Отмена",
     "cancel_success": "🚫 Заруба отменена.",
+    "reg_already_registered": "❌ @{user}, вы уже зарегистрированы на зарубу.",
+    "unreg_creator_forbidden": "❌ @{user}, создатель зарубы не может сняться, только отменить ее.",
 
     "list_reg_yes": "✅ @{user} - на {time}\n",
     "list_reg_no": "❌ @{user} не зарегистрирован\n",

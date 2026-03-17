@@ -36,8 +36,11 @@ async def test_zaruba_command(test_db):
     await zaruba_handlers.zaruba(update, context)
 
     args, kwargs = update.message.reply_text.call_args
-    assert args == (MESSAGES["zaruba_created"].format(time="18:00"),)
+    assert MESSAGES["zaruba_created"].format(time="18:00") in args[0]
+    assert MESSAGES["list_registered"] in args[0]
+    assert "@test_user" in args[0]
     assert kwargs["reply_markup"] is not None
+    assert kwargs["parse_mode"] == "Markdown"
 
 
 @pytest.mark.asyncio
@@ -86,6 +89,32 @@ async def test_reg_command(test_db):
 
     update.message.reply_text.assert_called_once_with(
         MESSAGES["reg_success"].format(user="new_user", time="18:00")
+    )
+
+
+@pytest.mark.asyncio
+async def test_reg_command_already_registered(test_db):
+    """Test /reg command when user is already registered."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
+    update.effective_user.username = "test_user"
+    update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["18:00"]
+
+    await zaruba_handlers.zaruba(update, context)
+
+    update.message.reply_text.reset_mock()
+    context.args = []
+
+    await zaruba_handlers.reg(update, context)
+
+    update.message.reply_text.assert_called_once_with(
+        MESSAGES["reg_already_registered"].format(user="test_user")
     )
 
 
@@ -150,13 +179,47 @@ async def test_unreg(test_db):
 
     await zaruba_handlers.zaruba(update, context)
 
+    update.message.reply_text.reset_mock()
+    update.effective_user.id = 2
+    update.effective_user.username = "other_user"
+    context.args = []
+
+    await zaruba_handlers.reg(update, context)
+
     # Now unregister
     update.message.reply_text.reset_mock()
 
     await zaruba_handlers.unreg(update, context)
 
     update.message.reply_text.assert_called_once_with(
-        MESSAGES["unreg_success"].format(user="test_user")
+        MESSAGES["unreg_success"].format(user="other_user")
+    )
+
+
+@pytest.mark.asyncio
+async def test_unreg_creator_forbidden(test_db):
+    """Test /unreg command does not let the creator unreg."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 1
+    update.effective_user.username = "test_user"
+    update.effective_user.first_name = "Test"
+    update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["18:00"]
+
+    await zaruba_handlers.zaruba(update, context)
+
+    update.message.reply_text.reset_mock()
+    context.args = []
+
+    await zaruba_handlers.unreg(update, context)
+
+    update.message.reply_text.assert_called_once_with(
+        MESSAGES["unreg_creator_forbidden"].format(user="test_user")
     )
 
 
@@ -267,14 +330,17 @@ async def test_zaruba_callback_reg(test_db):
     callback_update.callback_query.data = "zaruba:reg"
     callback_update.callback_query.answer = AsyncMock()
     callback_update.callback_query.message = AsyncMock(spec=Message)
-    callback_update.callback_query.message.reply_text = AsyncMock()
+    callback_update.callback_query.edit_message_text = AsyncMock()
 
     await zaruba_handlers.zaruba_callback(callback_update, context)
 
     callback_update.callback_query.answer.assert_called_once_with()
-    callback_update.callback_query.message.reply_text.assert_called_once_with(
-        MESSAGES["reg_success"].format(user="new_user", time="18:00")
-    )
+    args, kwargs = callback_update.callback_query.edit_message_text.call_args
+    assert MESSAGES["zaruba_created"].format(time="18:00") in args[0]
+    assert "@creator" in args[0]
+    assert "@new_user" in args[0]
+    assert kwargs["reply_markup"] is not None
+    assert kwargs["parse_mode"] == "Markdown"
 
 
 @pytest.mark.asyncio
@@ -303,16 +369,12 @@ async def test_zaruba_callback_cancel_removes_buttons(test_db):
     callback_update.callback_query = AsyncMock()
     callback_update.callback_query.data = "zaruba:cancel"
     callback_update.callback_query.answer = AsyncMock()
-    callback_update.callback_query.edit_message_reply_markup = AsyncMock()
+    callback_update.callback_query.edit_message_text = AsyncMock()
     callback_update.callback_query.message = AsyncMock(spec=Message)
-    callback_update.callback_query.message.reply_text = AsyncMock()
 
     await zaruba_handlers.zaruba_callback(callback_update, context)
 
     callback_update.callback_query.answer.assert_called_once_with()
-    callback_update.callback_query.edit_message_reply_markup.assert_called_once_with(
-        reply_markup=None
-    )
-    callback_update.callback_query.message.reply_text.assert_called_once_with(
+    callback_update.callback_query.edit_message_text.assert_called_once_with(
         MESSAGES["cancel_success"]
     )
