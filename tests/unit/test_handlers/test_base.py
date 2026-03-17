@@ -133,27 +133,29 @@ async def test_admin_relay_ignores_other_users():
 @pytest.mark.asyncio
 async def test_admin_relay_disabled_without_env(monkeypatch):
     """Relay should be disabled when admin relay env vars are not configured."""
-    monkeypatch.delenv("ADMIN_RELAY_USER_ID", raising=False)
-    monkeypatch.delenv("ADMIN_RELAY_CHAT_ID", raising=False)
     from src.bot.core.config import get_settings
 
+    monkeypatch.delenv("ADMIN_RELAY_USER_ID", raising=False)
+    monkeypatch.delenv("ADMIN_RELAY_CHAT_ID", raising=False)
     get_settings.cache_clear()
+    try:
+        update = AsyncMock()
+        update.message = AsyncMock(spec=Message)
+        update.message.reply_text = AsyncMock()
+        update.effective_user = AsyncMock(spec=User)
+        update.effective_user.id = 999001
+        update.effective_chat.type = "private"
 
-    update = AsyncMock()
-    update.message = AsyncMock(spec=Message)
-    update.message.reply_text = AsyncMock()
-    update.effective_user = AsyncMock(spec=User)
-    update.effective_user.id = 999001
-    update.effective_chat.type = "private"
+        context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+        context.args = ["hello", "admins"]
+        context.bot.send_message = AsyncMock()
 
-    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
-    context.args = ["hello", "admins"]
-    context.bot.send_message = AsyncMock()
+        await admin_relay(update, context)
 
-    await admin_relay(update, context)
-
-    context.bot.send_message.assert_not_called()
-    update.message.reply_text.assert_not_called()
+        context.bot.send_message.assert_not_called()
+        update.message.reply_text.assert_not_called()
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.mark.asyncio
