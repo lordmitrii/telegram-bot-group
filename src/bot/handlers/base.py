@@ -5,6 +5,7 @@ import random
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from src.bot.core.config import get_settings
 from src.bot.i18n.messages import MESSAGES
 
 
@@ -38,3 +39,25 @@ async def beer_check_text(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         else MESSAGES["beer_check_yes"]
     )
     await update.message.reply_text(reply_text)
+
+
+async def admin_relay_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Relay plain text from the admin user into the configured admin chat."""
+    if update.message is None or update.effective_user is None:
+        return
+    settings = get_settings()
+    if (
+        settings.admin_relay_user_id is None
+        or settings.admin_relay_chat_id is None
+    ):
+        return
+    if update.effective_user.id != settings.admin_relay_user_id:
+        return
+    if not update.message.text:
+        return
+
+    await context.bot.send_message(
+        chat_id=settings.admin_relay_chat_id,
+        text=update.message.text,
+    )
+    await update.message.reply_text(MESSAGES["admin_relay_success"])

@@ -64,11 +64,16 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ~/telegram-bot
+            cat > .env <<EOF
+            TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            FOOTBALL_API_KEY=${{ secrets.FOOTBALL_API_KEY }}
+            ADMIN_RELAY_USER_ID=${{ secrets.ADMIN_RELAY_USER_ID }}
+            ADMIN_RELAY_CHAT_ID=${{ secrets.ADMIN_RELAY_CHAT_ID }}
+            EOF
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest
             docker stop telegram-bot || true
             docker rm telegram-bot || true
             docker run -d --restart always --name telegram-bot \
-              -e TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }} \
-              -e FOOTBALL_API_KEY=${{ secrets.FOOTBALL_API_KEY }} \
+              --env-file .env \
               -v ~/telegram-bot/db.sqlite3:/app/db.sqlite3 \
               ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest

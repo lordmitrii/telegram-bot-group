@@ -76,6 +76,7 @@ MESSAGES = {
 
     "unsubscribe": "❌ Дневные уведомления отключены.",
     "subscribe": "✅ Дневные уведомления подключены: футбол + праздник дня.",
+    "admin_relay_success": "✅ Сообщение отправлено в админский чат.",
 
     "football_game": "⚽ *{home} vs {away}* ({league})\n⏰ *{match_time}*\n\n",
     "todays_football": "🔥 *Сегодняшний футбольчик:*\n\n",

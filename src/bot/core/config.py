@@ -13,6 +13,12 @@ class Settings(BaseSettings):
 
     # Telegram
     token: str = Field(..., validation_alias="TOKEN")
+    admin_relay_user_id: Optional[int] = Field(
+        default=None, validation_alias="ADMIN_RELAY_USER_ID"
+    )
+    admin_relay_chat_id: Optional[int] = Field(
+        default=None, validation_alias="ADMIN_RELAY_CHAT_ID"
+    )
 
     # Database
     db_path: str = Field(default="db.sqlite3", validation_alias="DB_PATH")

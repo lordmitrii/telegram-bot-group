@@ -13,7 +13,11 @@ from src.bot.repositories.base import init_db
 def test_env():
     """Ensure required settings are present for test runs."""
     original_token = os.environ.get("TOKEN")
+    original_admin_relay_user_id = os.environ.get("ADMIN_RELAY_USER_ID")
+    original_admin_relay_chat_id = os.environ.get("ADMIN_RELAY_CHAT_ID")
     os.environ.setdefault("TOKEN", "test-token")
+    os.environ.setdefault("ADMIN_RELAY_USER_ID", "999001")
+    os.environ.setdefault("ADMIN_RELAY_CHAT_ID", "-100999001")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
@@ -21,6 +25,14 @@ def test_env():
         os.environ.pop("TOKEN", None)
     else:
         os.environ["TOKEN"] = original_token
+    if original_admin_relay_user_id is None:
+        os.environ.pop("ADMIN_RELAY_USER_ID", None)
+    else:
+        os.environ["ADMIN_RELAY_USER_ID"] = original_admin_relay_user_id
+    if original_admin_relay_chat_id is None:
+        os.environ.pop("ADMIN_RELAY_CHAT_ID", None)
+    else:
+        os.environ["ADMIN_RELAY_CHAT_ID"] = original_admin_relay_chat_id
 
 
 @pytest.fixture
