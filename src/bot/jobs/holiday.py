@@ -45,7 +45,7 @@ async def send_holiday_notifications(context: ContextTypes.DEFAULT_TYPE) -> None
 
 def schedule_holiday_updates(application: Application) -> None:
     """Schedule the daily holiday notification job."""
-    job_time = datetime.time(hour=12, minute=0, tzinfo=MOSCOW_TZ)
+    job_time = datetime.time(hour=9, minute=0, tzinfo=MOSCOW_TZ)
 
     if application.job_queue.get_jobs_by_name("holiday_updates"):
         return
