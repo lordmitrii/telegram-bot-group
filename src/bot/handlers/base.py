@@ -41,8 +41,8 @@ async def beer_check_text(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await update.message.reply_text(reply_text)
 
 
-async def admin_relay_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Relay plain text from the admin user into the configured admin chat."""
+async def admin_relay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Relay text from the admin user into the configured admin chat."""
     if update.message is None or update.effective_user is None:
         return
     settings = get_settings()
@@ -53,11 +53,16 @@ async def admin_relay_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         return
     if update.effective_user.id != settings.admin_relay_user_id:
         return
-    if not update.message.text:
+    if update.effective_chat is None or update.effective_chat.type != "private":
+        await update.message.reply_text(MESSAGES["admin_relay_private_only"])
         return
+    if not context.args:
+        await update.message.reply_text(MESSAGES["admin_relay_usage"])
+        return
+    relay_text = " ".join(context.args)
 
     await context.bot.send_message(
         chat_id=settings.admin_relay_chat_id,
-        text=update.message.text,
+        text=relay_text,
     )
     await update.message.reply_text(MESSAGES["admin_relay_success"])

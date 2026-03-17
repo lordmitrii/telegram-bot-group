@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 from telegram import Message, ReplyKeyboardMarkup, User
 from telegram.ext import ContextTypes
 
-from src.bot.handlers.base import admin_relay_text, beer_check_text, start, help_command, unknown
+from src.bot.handlers.base import admin_relay, beer_check_text, start, help_command, unknown
 from src.bot.i18n.messages import MESSAGES
 
 
@@ -88,19 +88,20 @@ async def test_beer_check_text_rare(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_admin_relay_text_allowed_user():
-    """Admin relay should forward text only for the configured admin user."""
+async def test_admin_relay_allowed_user_in_private_chat():
+    """Admin relay should forward command text only for the configured admin user."""
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
-    update.message.text = "hello admins"
     update.message.reply_text = AsyncMock()
     update.effective_user = AsyncMock(spec=User)
     update.effective_user.id = 999001
+    update.effective_chat.type = "private"
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["hello", "admins"]
     context.bot.send_message = AsyncMock()
 
-    await admin_relay_text(update, context)
+    await admin_relay(update, context)
 
     context.bot.send_message.assert_called_once_with(
         chat_id=-100999001,
@@ -110,26 +111,27 @@ async def test_admin_relay_text_allowed_user():
 
 
 @pytest.mark.asyncio
-async def test_admin_relay_text_ignores_other_users():
+async def test_admin_relay_ignores_other_users():
     """Relay should not run for non-admin users."""
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
-    update.message.text = "hello admins"
     update.message.reply_text = AsyncMock()
     update.effective_user = AsyncMock(spec=User)
     update.effective_user.id = 123
+    update.effective_chat.type = "private"
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["hello", "admins"]
     context.bot.send_message = AsyncMock()
 
-    await admin_relay_text(update, context)
+    await admin_relay(update, context)
 
     context.bot.send_message.assert_not_called()
     update.message.reply_text.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_admin_relay_text_disabled_without_env(monkeypatch):
+async def test_admin_relay_disabled_without_env(monkeypatch):
     """Relay should be disabled when admin relay env vars are not configured."""
     monkeypatch.delenv("ADMIN_RELAY_USER_ID", raising=False)
     monkeypatch.delenv("ADMIN_RELAY_CHAT_ID", raising=False)
@@ -139,15 +141,56 @@ async def test_admin_relay_text_disabled_without_env(monkeypatch):
 
     update = AsyncMock()
     update.message = AsyncMock(spec=Message)
-    update.message.text = "hello admins"
     update.message.reply_text = AsyncMock()
     update.effective_user = AsyncMock(spec=User)
     update.effective_user.id = 999001
+    update.effective_chat.type = "private"
 
     context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["hello", "admins"]
     context.bot.send_message = AsyncMock()
 
-    await admin_relay_text(update, context)
+    await admin_relay(update, context)
 
     context.bot.send_message.assert_not_called()
     update.message.reply_text.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_admin_relay_private_only():
+    """Relay command should only work in private chat."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.message.reply_text = AsyncMock()
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 999001
+    update.effective_chat.type = "group"
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["hello", "admins"]
+    context.bot.send_message = AsyncMock()
+
+    await admin_relay(update, context)
+
+    context.bot.send_message.assert_not_called()
+    update.message.reply_text.assert_called_once_with(MESSAGES["admin_relay_private_only"])
+
+
+@pytest.mark.asyncio
+async def test_admin_relay_requires_text():
+    """Relay command should require text after /relay."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.message.reply_text = AsyncMock()
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 999001
+    update.effective_chat.type = "private"
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = []
+    context.bot.send_message = AsyncMock()
+
+    await admin_relay(update, context)
+
+    context.bot.send_message.assert_not_called()
+    update.message.reply_text.assert_called_once_with(MESSAGES["admin_relay_usage"])
