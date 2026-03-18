@@ -6,6 +6,7 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, ContextTypes
 
+from src.bot.core.constants import MOSCOW_TZ
 from src.bot.i18n.messages import MESSAGES
 from src.bot.models.user import ChatUser
 from src.bot.repositories.subscriber import get_subscribers
