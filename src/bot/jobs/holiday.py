@@ -51,11 +51,9 @@ def schedule_holiday_updates(application: Application) -> None:
     if application.job_queue.get_jobs_by_name("holiday_updates"):
         return
 
-    application.job_queue.run_repeating(
+    application.job_queue.run_daily(
         send_holiday_notifications,
-        interval=job_time,
-        first=job_time,
+        time=job_time,
         name="holiday_updates",
         data=application,
     )
-
