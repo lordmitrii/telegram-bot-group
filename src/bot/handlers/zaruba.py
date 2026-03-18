@@ -330,6 +330,9 @@ async def botinok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if fine_applied:
         await query.edit_message_text(MESSAGES["botinok_fined"].format(target=target_username))
+        await query.message.reply_text(
+            MESSAGES["botinok_fined"].format(target=target_username)
+        )
         return
 
     await query.edit_message_text(
@@ -380,6 +383,9 @@ async def zaruba_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             reply_markup=_get_zaruba_markup(),
             parse_mode="Markdown",
         )
+        await query.message.reply_text(
+            MESSAGES["reg_success"].format(user=user.display_name, time=reg_time)
+        )
         return
 
     if action == "unreg":
@@ -401,6 +407,9 @@ async def zaruba_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 _format_zaruba_message(service.get_session(chat_id)),
                 reply_markup=_get_zaruba_markup(),
                 parse_mode="Markdown",
+            )
+            await query.message.reply_text(
+                MESSAGES["unreg_success"].format(user=user.display_name)
             )
         else:
             await query.answer(
@@ -424,6 +433,7 @@ async def zaruba_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
         await query.answer()
         await query.edit_message_text(MESSAGES["cancel_success"])
+        await query.message.reply_text(MESSAGES["cancel_success"])
         return
 
     await query.answer()
