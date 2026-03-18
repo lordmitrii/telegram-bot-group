@@ -87,7 +87,7 @@ MESSAGES = {
         "📺 Собираемся на футбол, братва! Регистрация на зарубу — /reg"
     ),
     "football_time": "футбольное время 🕒",
-    "todays_holiday": "🎉 <b>С праздником, братва!</b>\n\nСегодня: {title}\n\n{description}",
+    "todays_holiday": "🎉 <b>С праздником, братва!</b>\n\nСегодня у нас {title}\n\n{description}",
     "holiday_fallback_description": "Сегодня отличный повод немного отметить.",
 
     "beer_check_button": "Ты в пиве?",

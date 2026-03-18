@@ -2,32 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-import datetime
+from dataclasses import dataclass, field
 from html.parser import HTMLParser
 import logging
 import re
-from typing import List, Optional
+from typing import Dict, Iterable, List, Optional
 
 import requests
 
 from src.bot.core.config import get_settings
-from src.bot.core.constants import MOSCOW_TZ
 
-_RU_MONTHS = {
-    1: "января",
-    2: "февраля",
-    3: "марта",
-    4: "апреля",
-    5: "мая",
-    6: "июня",
-    7: "июля",
-    8: "августа",
-    9: "сентября",
-    10: "октября",
-    11: "ноября",
-    12: "декабря",
-}
+_FULL_SENTENCE_RE = re.compile(r"[^.!?]*[.!?](?=\s|$)")
 
 
 @dataclass(slots=True)
@@ -38,34 +23,63 @@ class Holiday:
     description: str
 
 
-class _CalendDayHTMLParser(HTMLParser):
-    """Collect cleaned text tokens from a Calend.ru day page."""
+@dataclass(slots=True)
+class _Node:
+    tag: str
+    attrs: Dict[str, str] = field(default_factory=dict)
+    children: List["_Node"] = field(default_factory=list)
+    texts: List[str] = field(default_factory=list)
+
+    def append_text(self, value: str) -> None:
+        cleaned = _clean_text(value)
+        if cleaned:
+            self.texts.append(cleaned)
+
+    def text_content(self) -> str:
+        parts = list(self.texts)
+        for child in self.children:
+            child_text = child.text_content()
+            if child_text:
+                parts.append(child_text)
+        return _clean_text(" ".join(parts))
+
+    def class_names(self) -> set[str]:
+        return set(self.attrs.get("class", "").split())
+
+
+class _CalendRootHTMLParser(HTMLParser):
+    """Build a lightweight DOM tree from the Calend.ru homepage."""
 
     def __init__(self) -> None:
         super().__init__()
+        self.root = _Node(tag="document")
+        self._stack: List[_Node] = [self.root]
         self._ignored_depth = 0
-        self.tokens: List[str] = []
 
     def handle_starttag(self, tag: str, attrs: List[tuple[str, Optional[str]]]) -> None:
         if tag in {"script", "style"}:
             self._ignored_depth += 1
 
+        node = _Node(
+            tag=tag,
+            attrs={key: value or "" for key, value in attrs},
+        )
+        self._stack[-1].children.append(node)
+        self._stack.append(node)
+
     def handle_endtag(self, tag: str) -> None:
+        for index in range(len(self._stack) - 1, 0, -1):
+            if self._stack[index].tag == tag:
+                del self._stack[index:]
+                break
+
         if tag in {"script", "style"} and self._ignored_depth:
             self._ignored_depth -= 1
 
     def handle_data(self, data: str) -> None:
         if self._ignored_depth:
             return
-
-        cleaned = _clean_text(data)
-        if not cleaned:
-            return
-
-        if self.tokens and self.tokens[-1] == cleaned:
-            return
-
-        self.tokens.append(cleaned)
+        self._stack[-1].append_text(data)
 
 
 def _clean_text(value: str) -> str:
@@ -73,44 +87,145 @@ def _clean_text(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
-def _find_token_index(tokens: List[str], target: str, start: int = 0) -> int:
-    """Find a token index by exact match."""
-    for index in range(start, len(tokens)):
-        if tokens[index] == target:
-            return index
-    return -1
+def _iter_nodes(node: _Node) -> Iterable[_Node]:
+    yield node
+    for child in node.children:
+        yield from _iter_nodes(child)
 
 
-def _looks_like_title(value: str) -> bool:
-    """Check whether a token looks like a holiday title."""
-    if len(value) < 5:
-        return False
-    if value.startswith("Image:"):
-        return False
-    if value.isdigit():
-        return False
-    if value in {"Праздники", "Международные праздники", "Праздники славян"}:
-        return False
-    if value.startswith(("Главная страница", "Адрес страницы:", "Сегодня", "Завтра")):
-        return False
-    if value.endswith("года") or "года," in value:
-        return False
-    return True
+def _find_first(
+    node: _Node,
+    *,
+    tag: Optional[str] = None,
+    class_name: Optional[str] = None,
+) -> Optional[_Node]:
+    for child in _iter_nodes(node):
+        if tag is not None and child.tag != tag:
+            continue
+        if class_name is not None and class_name not in child.class_names():
+            continue
+        return child
+    return None
 
 
-def _looks_like_description(value: str, title: str) -> bool:
-    """Check whether a token looks like a holiday description."""
-    if value == title:
-        return False
-    if len(value) < 25:
-        return False
-    if value.startswith("Image:"):
-        return False
-    if value in {"Международные праздники", "Праздники славян"}:
-        return False
-    if value.endswith("..."):
-        return False
-    return True
+def _find_all(
+    node: _Node,
+    *,
+    tag: Optional[str] = None,
+    class_name: Optional[str] = None,
+) -> List[_Node]:
+    matches: List[_Node] = []
+    for child in _iter_nodes(node):
+        if tag is not None and child.tag != tag:
+            continue
+        if class_name is not None and class_name not in child.class_names():
+            continue
+        matches.append(child)
+    return matches
+
+
+def _contains_holiday_cards(node: _Node) -> bool:
+    for item in _find_all(node, tag="li"):
+        if _find_first(item, tag="span", class_name="title") and _find_first(
+            item, tag="p", class_name="descr"
+        ):
+            return True
+    return False
+
+
+def _find_list_in_node(node: _Node) -> Optional[_Node]:
+    for candidate in _find_all(node, tag="ul", class_name="itemsNet"):
+        if _contains_holiday_cards(candidate):
+            return candidate
+    return None
+
+
+def _find_holiday_list(root: _Node) -> Optional[_Node]:
+    for parent in _iter_nodes(root):
+        children = parent.children
+        for index, child in enumerate(children):
+            if child.tag != "div" or "holiday" not in child.class_names():
+                continue
+
+            if index + 2 >= len(children):
+                continue
+
+            next_child = children[index + 1]
+            if next_child.tag != "a":
+                continue
+            if next_child.attrs.get("href") != "/holidays/":
+                continue
+            if "btntitle" not in next_child.class_names():
+                continue
+            if next_child.text_content() != "Праздники":
+                continue
+
+            for candidate in children[index + 2 :]:
+                holiday_list = _find_list_in_node(candidate)
+                if holiday_list is not None:
+                    return holiday_list
+
+    for candidate in _find_all(root, tag="ul", class_name="itemsNet"):
+        if _contains_holiday_cards(candidate):
+            return candidate
+
+    return None
+
+
+def _extract_holidays(holiday_list: _Node) -> List[Holiday]:
+    holidays: List[Holiday] = []
+    for child in holiday_list.children:
+        if child.tag != "li":
+            continue
+
+        title_node = _find_first(child, tag="span", class_name="title")
+        description_node = _find_first(child, tag="p", class_name="descr")
+
+        if title_node is None or description_node is None:
+            continue
+
+        title_link = _find_first(title_node, tag="a")
+        description_link = _find_first(description_node, tag="a")
+
+        title = (
+            title_link.text_content()
+            if title_link is not None
+            else title_node.text_content()
+        )
+        description_source = (
+            description_link.text_content()
+            if description_link is not None
+            else description_node.text_content()
+        )
+        summary = _summarize_description(description_source)
+
+        if title and summary:
+            holidays.append(Holiday(title=title, description=summary))
+
+    return holidays
+
+
+def _summarize_description(text: str) -> str:
+    """Keep up to the first three complete sentences and adapt to minor HTML text issues."""
+    cleaned = _clean_text(text)
+    if not cleaned:
+        return ""
+
+    # Calend.ru sometimes omits a space after sentence punctuation in truncated previews.
+    cleaned = re.sub(r"([.!?])([A-ZА-ЯЁ])", r"\1 \2", cleaned)
+    cleaned = re.sub(r"\s+([,.;:!?])", r"\1", cleaned)
+
+    sentences = [_clean_text(match.group(0)) for match in _FULL_SENTENCE_RE.finditer(cleaned)]
+    if not sentences:
+        return ""
+
+    summary = " ".join(sentences[:3]).strip()
+    summary = re.sub(r"\s+([,.;:!?])", r"\1", summary)
+    summary = re.sub(r"([.!?])(?:\s*\.)+$", r"\1", summary)
+    if summary:
+        return summary
+
+    return ""
 
 
 class HolidayService:
@@ -121,12 +236,7 @@ class HolidayService:
 
     async def get_todays_holiday(self) -> Optional[Holiday]:
         """Return a single holiday for today."""
-        today = datetime.datetime.now(MOSCOW_TZ).date()
-        url = self._settings.holiday_source_url_template.format(
-            year=today.year,
-            month=today.month,
-            day=today.day,
-        )
+        url = self._settings.holiday_source_url_template
 
         try:
             response = requests.get(
@@ -143,45 +253,19 @@ class HolidayService:
             logging.error(f"Error fetching today's holiday: {exc}")
             return None
 
-        parser = _CalendDayHTMLParser()
+        parser = _CalendRootHTMLParser()
         parser.feed(response.text)
-        holiday = self._extract_holiday(parser.tokens, today)
-        if holiday is not None:
-            return holiday
+
+        holiday_list = _find_holiday_list(parser.root)
+        if holiday_list is None:
+            logging.warning("Could not find the holidays block on source page.")
+            return None
+
+        holidays = _extract_holidays(holiday_list)
+        if holidays:
+            return holidays[0]
 
         logging.warning("Could not parse any holiday items from source page.")
-        return None
-
-    def _extract_holiday(
-        self, tokens: List[str], today: datetime.date
-    ) -> Optional[Holiday]:
-        """Extract the first holiday title and description from parsed tokens."""
-        date_heading = f"{today.day} {_RU_MONTHS[today.month]} {today.year} года"
-        section_start = _find_token_index(tokens, date_heading)
-        if section_start == -1:
-            return None
-
-        holidays_heading = _find_token_index(tokens, "Праздники", start=section_start)
-        if holidays_heading == -1:
-            return None
-
-        title = None
-        description = None
-        for token in tokens[holidays_heading + 1 :]:
-            if token in {"Именины", "Хроника", "Народный календарь"}:
-                break
-
-            if title is None and _looks_like_title(token):
-                title = token
-                continue
-
-            if title is not None and _looks_like_description(token, title):
-                description = token
-                break
-
-        if title and description:
-            return Holiday(title=title, description=description)
-
         return None
 
 

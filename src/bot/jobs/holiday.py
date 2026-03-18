@@ -43,16 +43,19 @@ async def send_holiday_notifications(context: ContextTypes.DEFAULT_TYPE) -> None
             logging.error(f"Error sending holiday message to {chat_id}: {exc}")
 
 
+
 def schedule_holiday_updates(application: Application) -> None:
-    """Schedule the daily holiday notification job."""
-    job_time = datetime.time(hour=9, minute=0, tzinfo=MOSCOW_TZ)
+    """Schedule the holiday notification job."""
+    job_time = datetime.timedelta(seconds=30)
 
     if application.job_queue.get_jobs_by_name("holiday_updates"):
         return
 
-    application.job_queue.run_daily(
+    application.job_queue.run_repeating(
         send_holiday_notifications,
-        job_time,
+        interval=job_time,
+        first=job_time,
         name="holiday_updates",
         data=application,
     )
+

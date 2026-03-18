@@ -34,7 +34,7 @@ class Settings(BaseSettings):
 
     # Holiday notifications
     holiday_source_url_template: str = Field(
-        default="https://www.calend.ru/day/{year}-{month}-{day}/",
+        default="https://www.calend.ru/",
         validation_alias="HOLIDAY_SOURCE_URL_TEMPLATE",
     )
 
