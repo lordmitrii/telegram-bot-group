@@ -83,9 +83,7 @@ MESSAGES = {
 
     "football_game": "⚽ *{home} vs {away}* ({league})\n⏰ *{match_time}*\n\n",
     "todays_football": "🔥 *Сегодняшний футбольчик:*\n\n",
-    "football_zaruba_cta": (
-        "📺 Собираемся на футбол, братва! Регистрация на зарубу — /reg"
-    ),
+    "football_zaruba_cta": "📺 Собираемся на футбол, братва!",
     "football_time": "футбольное время 🕒",
     "todays_holiday": "🎉 <b>С праздником, братва!</b>\n\nСегодня у нас {title}\n\n{description}",
     "holiday_fallback_description": "Сегодня отличный повод немного отметить.",
