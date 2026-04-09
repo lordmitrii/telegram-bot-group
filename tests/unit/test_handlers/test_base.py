@@ -6,7 +6,15 @@ from unittest.mock import AsyncMock
 from telegram import Message, ReplyKeyboardMarkup, User
 from telegram.ext import ContextTypes
 
-from src.bot.handlers.base import admin_relay, beer_check_text, start, help_command, unknown
+from src.bot.handlers.base import (
+    admin_relay,
+    beer_check_text,
+    help_command,
+    maybe_reply_with_deferral,
+    start,
+    unknown,
+    with_funny_deferral,
+)
 from src.bot.i18n.messages import MESSAGES
 
 
@@ -55,6 +63,54 @@ async def test_unknown_command():
     await unknown(update, context)
 
     update.message.reply_text.assert_called_once_with(MESSAGES["unknown"])
+
+
+@pytest.mark.asyncio
+async def test_maybe_reply_with_deferral_triggers(monkeypatch):
+    """Funny deferral should reply and stop command handling."""
+    monkeypatch.setattr("src.bot.handlers.base.should_skip_command", lambda: True)
+    monkeypatch.setattr("src.bot.handlers.base.random.choice", lambda replies: replies[0])
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.message.reply_text = AsyncMock()
+
+    handled = await maybe_reply_with_deferral(update)
+
+    assert handled is True
+    update.message.reply_text.assert_called_once_with(MESSAGES["command_deferrals"][0])
+
+
+@pytest.mark.asyncio
+async def test_with_funny_deferral_skips_handler(monkeypatch):
+    """Wrapped command should not call the original handler after a deferral."""
+    monkeypatch.setattr("src.bot.handlers.base.should_skip_command", lambda: True)
+    monkeypatch.setattr("src.bot.handlers.base.random.choice", lambda replies: replies[1])
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.message.reply_text = AsyncMock()
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    handler = AsyncMock()
+
+    await with_funny_deferral(handler)(update, context)
+
+    update.message.reply_text.assert_called_once_with(MESSAGES["command_deferrals"][1])
+    handler.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_with_funny_deferral_calls_handler(monkeypatch):
+    """Wrapped command should call the original handler when the deferral does not trigger."""
+    monkeypatch.setattr("src.bot.handlers.base.should_skip_command", lambda: False)
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.message.reply_text = AsyncMock()
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    handler = AsyncMock()
+
+    await with_funny_deferral(handler)(update, context)
+
+    update.message.reply_text.assert_not_called()
+    handler.assert_called_once_with(update, context)
 
 
 @pytest.mark.asyncio

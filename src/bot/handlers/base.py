@@ -1,5 +1,7 @@
 """Base handlers for start, help, and unknown commands."""
 
+from collections.abc import Awaitable, Callable
+from functools import wraps
 import random
 
 from telegram import ReplyKeyboardMarkup, Update
@@ -7,6 +9,34 @@ from telegram.ext import ContextTypes
 
 from src.bot.core.config import get_settings
 from src.bot.i18n.messages import MESSAGES
+
+CommandHandlerCallback = Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]]
+
+
+def should_skip_command() -> bool:
+    """Return whether the command should short-circuit with a funny deferral."""
+    return random.random() < 0.1
+
+
+async def maybe_reply_with_deferral(update: Update) -> bool:
+    """Reply with a funny deferral and signal whether command handling should stop."""
+    if update.message is None or not should_skip_command():
+        return False
+
+    await update.message.reply_text(random.choice(MESSAGES["command_deferrals"]))
+    return True
+
+
+def with_funny_deferral(handler: CommandHandlerCallback) -> CommandHandlerCallback:
+    """Wrap a command handler with a small chance to send a funny deferral reply."""
+
+    @wraps(handler)
+    async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if await maybe_reply_with_deferral(update):
+            return
+        await handler(update, context)
+
+    return wrapped
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
