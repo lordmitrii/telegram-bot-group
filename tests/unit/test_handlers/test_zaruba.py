@@ -265,6 +265,31 @@ async def test_botinok_vote_and_fine(test_db):
 
 
 @pytest.mark.asyncio
+async def test_botinok_against_lordmitrii_backfires(test_db):
+    """Trying to botinok lordmitrii should immediately fine the voter."""
+    update = AsyncMock()
+    update.message = AsyncMock(spec=Message)
+    update.effective_user = AsyncMock(spec=User)
+    update.effective_user.id = 2
+    update.effective_user.username = "voter"
+    update.effective_user.first_name = "Voter"
+    update.message.reply_text = AsyncMock()
+    update.effective_chat.id = 123456
+
+    context = AsyncMock(spec=ContextTypes.DEFAULT_TYPE)
+    context.args = ["@lordmitrii"]
+
+    await zaruba_handlers.botinok(update, context)
+
+    update.message.reply_text.assert_called_once_with(
+        MESSAGES["botinok_protected_backfire"].format(user="voter")
+    )
+    service = zaruba_handlers._get_service()
+    assert service.get_user_aura(123456, user_id=2, username="voter").aura_points == -1000
+    assert service.get_user_aura(123456, username="lordmitrii").aura_points == 99999999
+
+
+@pytest.mark.asyncio
 async def test_botinok_callback_fines_and_edits_message(test_db):
     """Inline botinok button should allow the second vote without typing the command again."""
     update = AsyncMock()
