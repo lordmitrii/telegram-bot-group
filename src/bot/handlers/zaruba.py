@@ -262,6 +262,7 @@ async def botinok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     chat_id = update.effective_chat.id
     service = _get_service()
+    service.track_user(chat_id, user)
     votes, fine_applied, already_voted = service.register_botinok_vote(
         chat_id,
         user.display_name,
@@ -278,6 +279,11 @@ async def botinok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if fine_applied:
+        if service.is_protected_aura_user(target_username):
+            await update.message.reply_text(
+                MESSAGES["botinok_protected_backfire"].format(user=user.display_name)
+            )
+            return
         await update.message.reply_text(
             MESSAGES["botinok_fined"].format(target=target_username)
         )
@@ -310,6 +316,7 @@ async def botinok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     chat_id = update.effective_chat.id
     service = _get_service()
+    service.track_user(chat_id, user)
     votes, fine_applied, already_voted = service.register_botinok_vote(
         chat_id,
         user.display_name,
@@ -329,6 +336,13 @@ async def botinok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await query.answer()
 
     if fine_applied:
+        if service.is_protected_aura_user(target_username):
+            message = MESSAGES["botinok_protected_backfire"].format(
+                user=user.display_name
+            )
+            await query.edit_message_text(message)
+            await query.message.reply_text(message)
+            return
         await query.edit_message_text(MESSAGES["botinok_fined"].format(target=target_username))
         await query.message.reply_text(
             MESSAGES["botinok_fined"].format(target=target_username)

@@ -221,6 +221,34 @@ def test_botinok_requires_two_unique_votes(test_db):
     assert (votes, fine_applied, already_voted) == (1, False, False)
 
 
+def test_lordmitrii_has_protected_aura_and_botinok_backfires(test_db):
+    """lordmitrii should keep hardcoded aura and botinok should fine the voter."""
+    session_repo = SessionRepository(test_db)
+    stats_repo = ZarubaStatsRepository(test_db)
+    aura_repo = AuraRepository(test_db)
+    service = ZarubaService(
+        session_repo=session_repo,
+        stats_repo=stats_repo,
+        aura_repo=aura_repo,
+        user_repo=UserIdentityRepository(test_db),
+    )
+
+    service.track_user(123, make_user(10, "lordmitrii"))
+    service.track_user(123, make_user(11, "voter"))
+
+    service._aura_repo.change_points(123, "lordmitrii", -5000, user_id=10)
+
+    protected_aura = service.get_user_aura(123, user_id=10, username="lordmitrii")
+    assert protected_aura.aura_points == 99999999
+
+    votes, fine_applied, already_voted = service.register_botinok_vote(
+        123, "voter", "LordMitrii"
+    )
+    assert (votes, fine_applied, already_voted) == (0, True, False)
+    assert service.get_user_aura(123, user_id=11, username="voter").aura_points == -1000
+    assert service.get_user_aura(123, username="lordmitrii").aura_points == 99999999
+
+
 def test_get_aura_verdict(test_db):
     """Aura verdict should reflect sign and highest aura in chat."""
     service = ZarubaService(

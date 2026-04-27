@@ -80,6 +80,7 @@ MESSAGES = {
     "botinok_already_voted": "❌ @{user}, вы уже голосовали против @{target}.",
     "botinok_vote": "👞 Голос против @{target} засчитан. Сейчас голосов: {votes}/2.",
     "botinok_fined": "💸 @{target} получает штраф: -1000 к ауре.",
+    "botinok_protected_backfire": "💥 @{user} получает штраф: -1000 к ауре.",
     "botinok_button": "🔨 Добить @{target}",
 
     "list_members_error": "❌ Не удалось получить список участников группы.",

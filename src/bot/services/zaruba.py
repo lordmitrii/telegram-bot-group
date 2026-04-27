@@ -18,6 +18,11 @@ from src.bot.repositories.user_identity import (
 from src.bot.repositories.zaruba import ZarubaStatsRepository
 
 
+PROTECTED_AURA_USERNAME = "lordmitrii"
+PROTECTED_AURA_POINTS = 99_999_999
+BOTINOK_BACKFIRE_POINTS = -1000
+
+
 class ZarubaService:
     """Service for managing zaruba events."""
 
@@ -34,6 +39,24 @@ class ZarubaService:
         self._aura_repo = aura_repo or get_aura_repo()
         self._botinok_repo = botinok_repo or get_botinok_repo()
         self._user_repo = user_repo or get_user_identity_repo()
+
+    @staticmethod
+    def is_protected_aura_user(username: str | None) -> bool:
+        """Return whether the username has hardcoded protected aura."""
+        return username is not None and username.lower() == PROTECTED_AURA_USERNAME
+
+    def _protected_aura(
+        self,
+        chat_id: int,
+        username: str | None = None,
+        user_id: int | None = None,
+    ) -> UserAura:
+        return UserAura(
+            person_name=username or PROTECTED_AURA_USERNAME,
+            chat_id=chat_id,
+            aura_points=PROTECTED_AURA_POINTS,
+            user_id=user_id,
+        )
 
     def track_user(self, chat_id: int, user: ChatUser) -> None:
         """Persist the latest known identity for a Telegram user."""
@@ -207,13 +230,25 @@ class ZarubaService:
     ) -> UserAura:
         """Get aura for a user."""
         label = username or str(user_id)
+        if self.is_protected_aura_user(username):
+            return self._protected_aura(chat_id, username=username, user_id=user_id)
         if user_id is not None:
             known_user = self._user_repo.get_by_user_id(chat_id, user_id)
             label = known_user.display_name if known_user else label
+            if self.is_protected_aura_user(label):
+                return self._protected_aura(
+                    chat_id, username=label, user_id=user_id
+                )
             return self._aura_repo.get_aura(chat_id, label, user_id=user_id)
         if username is not None:
             known_user = self._user_repo.get_by_username(chat_id, username)
             if known_user is not None:
+                if self.is_protected_aura_user(known_user.display_name):
+                    return self._protected_aura(
+                        chat_id,
+                        username=known_user.display_name,
+                        user_id=known_user.user_id,
+                    )
                 return self._aura_repo.get_aura(
                     chat_id, known_user.display_name, user_id=known_user.user_id
                 )
@@ -221,6 +256,8 @@ class ZarubaService:
 
     def get_aura_verdict(self, chat_id: int, aura_points: int) -> str:
         """Get the text verdict for a user's aura in a chat."""
+        if aura_points == PROTECTED_AURA_POINTS:
+            return MESSAGES["stats_aura_incredible"]
         max_aura = self._aura_repo.get_max_aura_points(chat_id)
         if max_aura is not None and aura_points == max_aura and aura_points > 0:
             return MESSAGES["stats_aura_incredible"]
@@ -230,6 +267,8 @@ class ZarubaService:
 
     def get_aura_verdict_label(self, chat_id: int, aura_points: int) -> str:
         """Get the short aura verdict label for combined stats output."""
+        if aura_points == PROTECTED_AURA_POINTS:
+            return MESSAGES["stats_aura_incredible_label"]
         max_aura = self._aura_repo.get_max_aura_points(chat_id)
         if max_aura is not None and aura_points == max_aura and aura_points > 0:
             return MESSAGES["stats_aura_incredible_label"]
@@ -272,6 +311,18 @@ class ZarubaService:
         target_username: str,
     ) -> Tuple[int, bool, bool]:
         """Register a /botinok vote and fine the target after two unique votes."""
+        if self.is_protected_aura_user(target_username):
+            voter_user = self._user_repo.get_by_username(chat_id, voter_username)
+            voter_user_id = voter_user.user_id if voter_user else None
+            voter_name = voter_user.display_name if voter_user else voter_username
+            self._aura_repo.change_points(
+                chat_id,
+                voter_name,
+                BOTINOK_BACKFIRE_POINTS,
+                user_id=voter_user_id,
+            )
+            return 0, True, False
+
         if self._botinok_repo.has_vote(chat_id, target_username, voter_username):
             current_votes = self._botinok_repo.add_vote(
                 chat_id, target_username, voter_username
