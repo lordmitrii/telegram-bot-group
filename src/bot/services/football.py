@@ -77,7 +77,8 @@ class FootballService:
             match_time_api = match["utcDate"]
 
             # Champions League matches
-            if league_id == 2001 or league_name_api == "UEFA Champions League":
+            # Champions League | World Cup | Euro cup matches
+            if league_id in (2001, 2000, 2146, 2182, 2154, 2018) or league_name_api in ("UEFA Champions League","FIFA World Cup", "European Championship", "UEFA Europa League", "UEFA Nations League", "UEFA Conference League"):
                 home_team = self._get_team_name(home_team_api)
                 away_team = self._get_team_name(away_team_api)
                 big_games.append(
