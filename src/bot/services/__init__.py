@@ -5,6 +5,7 @@ from src.bot.services.football import FootballService
 from src.bot.services.holiday import HolidayService
 from src.bot.services.scraper import ScraperService
 from src.bot.services.notification import NotificationService
+from src.bot.services.gpt import GPTService
 
 __all__ = [
     "ZarubaService",
@@ -12,4 +13,5 @@ __all__ = [
     "HolidayService",
     "ScraperService",
     "NotificationService",
+    "GPTService",
 ]

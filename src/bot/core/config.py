@@ -43,6 +43,14 @@ class Settings(BaseSettings):
         default=300, validation_alias="SCRAPER_POLL_INTERVAL"
     )
 
+    # OpenAI
+    openai_api_key: Optional[str] = Field(
+        default=None, validation_alias="OPENAI_API_KEY"
+    )
+    openai_model: str = Field(
+        default="gpt-4o-mini", validation_alias="OPENAI_MODEL"
+    )
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

@@ -69,6 +69,7 @@ jobs:
             FOOTBALL_API_KEY=${{ secrets.FOOTBALL_API_KEY }}
             ADMIN_RELAY_USER_ID=${{ secrets.ADMIN_RELAY_USER_ID }}
             ADMIN_RELAY_CHAT_ID=${{ secrets.ADMIN_RELAY_CHAT_ID }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             EOF
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/telegram-bot:latest
             docker stop telegram-bot || true

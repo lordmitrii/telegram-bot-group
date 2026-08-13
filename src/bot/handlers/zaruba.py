@@ -256,7 +256,7 @@ async def botinok(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not target_username:
         await update.message.reply_text(MESSAGES["botinok_no_target"])
         return
-    if target_username == user.display_name:
+    if target_username.lower() == user.display_name.lower():
         await update.message.reply_text(MESSAGES["botinok_self"])
         return
 
@@ -310,7 +310,7 @@ async def botinok_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     if not target_username:
         await query.answer(MESSAGES["botinok_no_target"], show_alert=True)
         return
-    if target_username == user.display_name:
+    if target_username.lower() == user.display_name.lower():
         await query.answer(MESSAGES["botinok_self"], show_alert=True)
         return
 
