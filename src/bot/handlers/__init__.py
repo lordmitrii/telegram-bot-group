@@ -2,17 +2,17 @@
 
 from typing import List
 
+from telegram import MessageEntity
 from telegram.ext import (
     BaseHandler,
     CallbackQueryHandler,
     CommandHandler,
-    InlineQueryHandler,
     MessageHandler,
     filters,
 )
 
 from src.bot.handlers import football as football_handlers
-from src.bot.handlers import inline as inline_handlers
+from src.bot.handlers import mention as mention_handlers
 from src.bot.handlers import zaruba as zaruba_handlers
 from src.bot.handlers.base import (
     admin_relay,
@@ -49,7 +49,10 @@ def get_handlers() -> List[BaseHandler]:
         ),
         MessageHandler(filters.Regex("^Ты в пиве\\?$"), beer_check_text),
         MessageHandler(filters.COMMAND, unknown),
-        InlineQueryHandler(inline_handlers.inline_query),
+        MessageHandler(
+            filters.TEXT & filters.Entity(MessageEntity.MENTION),
+            mention_handlers.mention_reply,
+        ),
     ]
 
 

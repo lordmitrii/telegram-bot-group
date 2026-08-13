@@ -18,5 +18,5 @@ def test_handler_count():
     """Ensure correct number of handlers."""
     handlers = get_handlers()
     # 12 command handlers + 2 callback handlers + 1 text handler
-    # + 1 unknown handler + 1 inline query handler
+    # + 1 unknown handler + 1 mention handler
     assert len(handlers) == 17
